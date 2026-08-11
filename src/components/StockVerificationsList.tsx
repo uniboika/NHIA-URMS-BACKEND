@@ -26,9 +26,7 @@ interface Verification {
   unit?: { name: string };
 }
 
-import type { GeoScopeProps } from "@/src/access/reportScopeAccess";
-
-interface Props extends GeoScopeProps {
+interface Props {
   onBack: () => void;
 }
 
@@ -52,9 +50,7 @@ function safeDate(v: string | null | undefined) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function StockVerificationsList({
-  onBack, defaultZoneId, defaultStateId, reportScope,
-}: Props) {
+export default function StockVerificationsList({ onBack }: Props) {
   const [mode, setMode] = React.useState<"list" | "form">("list");
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
   const [verifications, setVerifications] = React.useState<Verification[]>([]);
@@ -93,9 +89,6 @@ export default function StockVerificationsList({
       <StockVerificationPage
         verificationId={selectedId}
         onBack={closeForm}
-        defaultZoneId={defaultZoneId}
-        defaultStateId={defaultStateId}
-        reportScope={reportScope}
       />
     );
   }

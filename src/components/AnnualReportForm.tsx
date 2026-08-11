@@ -10,9 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { annualReportApi, stockApi } from "@/lib/api";
+import { annualReportApi } from "@/lib/api";
 import type { AnnualReportPayload } from "@/lib/api";
-import type { GeoScopeProps } from "@/src/access/reportScopeAccess";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,13 +34,20 @@ interface QuarterlyData {
   premiumExtraDependant: QuarterRow; additionalDependants: QuarterRow;
   changeOfProvider: QuarterRow;
 }
-interface AnnualReportFormProps extends GeoScopeProps {
+interface AnnualReportFormProps {
   onBack: () => void;
   onSubmit: (referenceId: string) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const NIGERIAN_STATES = [
+  "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno",
+  "Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT - Abuja","Gombe",
+  "Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos",
+  "Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto",
+  "Taraba","Yobe","Zamfara",
+];
 const YEARS = ["2025","2024","2023","2022"];
 const QUARTERLY_FIELDS: { key: keyof QuarterlyData; label: string }[] = [
   { key: "gifshipEnrolments",    label: "GIFSHIP Enrolments" },
@@ -142,19 +148,7 @@ function ReviewQuarterRow({ label, value }: { label: string; value: QuarterRow }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function AnnualReportForm({
-  onBack, onSubmit, defaultZoneId, defaultStateId, reportScope = "national",
-}: AnnualReportFormProps) {
-  const lockState = reportScope === "state" || !!defaultStateId;
-  const [stateOptions, setStateOptions] = React.useState<{ id: number; description: string }[]>([]);
-
-  React.useEffect(() => {
-    const load = defaultZoneId
-      ? stockApi.getStates(defaultZoneId)
-      : stockApi.getStates();
-    load.then((r) => setStateOptions(r.data)).catch(() => setStateOptions([]));
-  }, [defaultZoneId]);
-
+export default function AnnualReportForm({ onBack, onSubmit }: AnnualReportFormProps) {
   const [step, setStep] = React.useState<Step>("general");
   const [isSaving, setIsSaving] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -164,12 +158,6 @@ export default function AnnualReportForm({
     year: "2025", state: "", staffNo: "", totalVehicles: "",
     totalHCF: "", totalAccreditedHCF2025: "", approvedBudget2025: "", totalAmountUtilized2025: "",
   });
-
-  React.useEffect(() => {
-    if (!defaultStateId || !stateOptions.length) return;
-    const match = stateOptions.find((s) => String(s.id) === defaultStateId);
-    if (match) setGeneral((p) => ({ ...p, state: match.description }));
-  }, [defaultStateId, stateOptions]);
   const [clinical, setClinical] = React.useState<ClinicalData>({
     totalAccreditedCEmONC: "", totalCEmONCBeneficiaries: "",
     totalAccreditedFFP: "", totalFFPBeneficiaries: "",
@@ -317,17 +305,9 @@ export default function AnnualReportForm({
                       </div>
                       <div className="space-y-2">
                         <Label>State <span className="text-red-500">*</span></Label>
-                        <Select
-                          value={general.state}
-                          onValueChange={v => setGeneral(p => ({ ...p, state: v }))}
-                          disabled={lockState}
-                        >
+                        <Select value={general.state} onValueChange={v => setGeneral(p => ({ ...p, state: v }))}>
                           <SelectTrigger className="w-full"><SelectValue placeholder="Select State" /></SelectTrigger>
-                          <SelectContent>
-                            {stateOptions.map(s => (
-                              <SelectItem key={s.id} value={s.description}>{s.description}</SelectItem>
-                            ))}
-                          </SelectContent>
+                          <SelectContent>{NIGERIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                     </div>

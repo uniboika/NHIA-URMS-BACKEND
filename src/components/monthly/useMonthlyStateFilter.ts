@@ -1,18 +1,14 @@
 import * as React from "react";
 import { stockApi } from "@/lib/api";
-import type { ReportScope } from "@/src/access/reportScopeAccess";
 
 export const ALL_STATES = "all";
 
 export function useMonthlyStateFilter(
   defaultStateId?: string | null,
   defaultZoneId?: string | null,
-  reportScope?: ReportScope,
 ) {
-  const lockState = reportScope === "state" || !!defaultStateId;
-  const [filterState, setFilterState] = React.useState(
-    lockState && defaultStateId ? defaultStateId : (defaultStateId ?? ALL_STATES),
-  );
+  const lockState = !!defaultStateId;
+  const [filterState, setFilterState] = React.useState(defaultStateId ?? ALL_STATES);
   const [states, setStates] = React.useState<{ id: number; description: string }[]>([]);
 
   const showStateFilter = !lockState;

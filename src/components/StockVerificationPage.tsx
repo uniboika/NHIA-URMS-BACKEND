@@ -32,9 +32,7 @@ interface ItemRow {
   remarks: string;
 }
 
-import type { GeoScopeProps } from "@/src/access/reportScopeAccess";
-
-interface StockVerificationPageProps extends GeoScopeProps {
+interface StockVerificationPageProps {
   onBack: () => void;
   verificationId?: number | null;
 }
@@ -68,12 +66,8 @@ const typeLabel = (value: string) =>
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function StockVerificationPage({
-  onBack, verificationId, defaultZoneId, defaultStateId,
-}: StockVerificationPageProps) {
+export default function StockVerificationPage({ onBack, verificationId }: StockVerificationPageProps) {
   const hydratingRef = React.useRef(false);
-  const lockZone = !!defaultZoneId;
-  const lockState = !!defaultStateId;
   // ── Dropdown data ──────────────────────────────────────────────────────────
   const [zones,       setZones]       = React.useState<DropdownOption[]>([]);
   const [states,      setStates]      = React.useState<DropdownOption[]>([]);
@@ -82,8 +76,8 @@ export default function StockVerificationPage({
   const [assets,      setAssets]      = React.useState<any[]>([]);
 
   // ── Form header ────────────────────────────────────────────────────────────
-  const [zoneId,       setZoneId]       = React.useState(defaultZoneId ?? "");
-  const [stateId,      setStateId]      = React.useState(defaultStateId ?? "");
+  const [zoneId,       setZoneId]       = React.useState("");
+  const [stateId,      setStateId]      = React.useState("");
   const [departmentId, setDepartmentId] = React.useState("");
   const [unitId,       setUnitId]       = React.useState("");
   const [stockType,    setStockType]    = React.useState("");
@@ -101,14 +95,6 @@ export default function StockVerificationPage({
   const [submitting,    setSubmitting]    = React.useState(false);
   const [savedId,       setSavedId]       = React.useState<number | null>(null);
   const [refId,         setRefId]         = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (defaultZoneId) setZoneId(defaultZoneId);
-  }, [defaultZoneId]);
-
-  React.useEffect(() => {
-    if (defaultStateId) setStateId(defaultStateId);
-  }, [defaultStateId]);
 
   // ── Load zones on mount ────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -402,7 +388,7 @@ export default function StockVerificationPage({
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label>Zone <span className="text-red-500">*</span></Label>
-                    <Select value={zoneId} onValueChange={setZoneId} disabled={lockZone}>
+                    <Select value={zoneId} onValueChange={setZoneId}>
                       <SelectTrigger className="w-full"
                         displayValue={labelOf(zones, zoneId, "Select Zone")}>
                         <SelectValue placeholder="Select Zone" />
@@ -414,7 +400,7 @@ export default function StockVerificationPage({
                   </div>
                   <div className="space-y-2">
                     <Label>State <span className="text-red-500">*</span></Label>
-                    <Select value={stateId} onValueChange={setStateId} disabled={lockState || !zoneId}>
+                    <Select value={stateId} onValueChange={setStateId} disabled={!zoneId}>
                       <SelectTrigger className="w-full"
                         displayValue={labelOf(states, stateId, "Select State")}>
                         <SelectValue placeholder="Select State" />

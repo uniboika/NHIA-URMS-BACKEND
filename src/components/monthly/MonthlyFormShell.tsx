@@ -39,8 +39,6 @@ export default function MonthlyFormShell({
   defaultZoneId, defaultStateId, yearOptions,
 }: Props) {
   const years = yearOptions?.length ? yearOptions : buildReportingYearOptions();
-  const lockZone = !!defaultZoneId;
-  const lockState = !!defaultStateId;
   const [zones,  setZones]  = React.useState<any[]>([]);
   const [states, setStates] = React.useState<any[]>([]);
   const [zoneId, setZoneId] = React.useState(defaultZoneId ?? "");
@@ -114,7 +112,7 @@ export default function MonthlyFormShell({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-white rounded-2xl border border-[#d4e8dc]">
             <div className="space-y-2">
               <Label className="text-xs font-bold">Zone <span className="text-red-500">*</span></Label>
-              <Select value={zoneId} onValueChange={setZoneId} disabled={lockZone}>
+              <Select value={zoneId} onValueChange={setZoneId}>
                 <SelectTrigger className="w-full"
                   displayValue={zoneId ? (zones.find(z => String(z.id) === zoneId)?.description ?? "Select Zone") : "Select Zone"}>
                   <SelectValue placeholder="Select Zone" />
@@ -124,7 +122,7 @@ export default function MonthlyFormShell({
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold">State <span className="text-red-500">*</span></Label>
-              <Select value={stateId} onValueChange={setStateId} disabled={lockState || !zoneId}>
+              <Select value={stateId} onValueChange={setStateId} disabled={!zoneId}>
                 <SelectTrigger className="w-full"
                   displayValue={stateId ? (states.find(s => String(s.id) === stateId)?.description ?? "Select State") : "Select State"}>
                   <SelectValue placeholder="Select State" />
