@@ -1,7 +1,8 @@
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, RefreshCw, Loader2, Package, ClipboardList,
-  Boxes, Wrench,
+  ArrowLeft, RefreshCw, Loader2, ClipboardList,
+  Send, Warehouse, PackageCheck, Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,13 @@ import { useDashboardDrill } from "@/components/dashboard/useDashboardDrill";
 import { ClickableKpi, DrillHint, COLORS, getUnitHeadScope } from "@/components/dashboard/dashboardUi";
 
 const UNIT_NAME = "Stock Verification Unit";
+
+const MODULE_SHORT: Record<string, string> = {
+  "Physical Asset Verification": "Physical assets",
+  "Verification of Supply": "Verify supply",
+  "Inventory Register": "Inventory",
+  "Capitalisation & Issuance": "Capitalise / issue",
+};
 
 const GEO_SCOPED = new Set(["verifications", "supply_verifications", "variance_items", "assets"]);
 
@@ -36,6 +44,7 @@ function ChartEmpty({ message = "No records in the system for this view yet." }:
 }
 
 export default function StockVerificationDashboard({ onBack, defaultStateId, defaultZoneId }: Props) {
+  const navigate = useNavigate();
   const [data, setData] = React.useState<any | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -70,7 +79,13 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
     (data?.monthly_activity ?? []).map((m: any) => ({ ...m, label: m.month?.slice(5) ?? m.month })),
   [data]);
 
-  const moduleChart = React.useMemo(() => data?.module_breakdown ?? [], [data]);
+  const moduleChart = React.useMemo(
+    () => (data?.module_breakdown ?? []).map((row: any) => ({
+      ...row,
+      short: MODULE_SHORT[row.module] || row.module,
+    })),
+    [data],
+  );
   const supplyVerdictChart = React.useMemo(
     () => (data?.supply_by_verdict ?? []).filter((d: any) => d.count > 0),
     [data],
@@ -97,17 +112,14 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
   };
 
   const drillModule = (moduleName: string) => {
-    const map: Record<string, { segment: string; title: string }> = {
-      "Physical Asset Verification": { segment: "verifications", title: "Physical Asset Verifications" },
-      "Verification of Supply": { segment: "supply_verifications", title: "Verification of Supply" },
-      "SVO Assets": { segment: "svo_assets", title: "SVO Assets Registered" },
-      "Inventory Catalog": { segment: "inventory_items", title: "Inventory Catalog" },
-      "Transfers & Movements": { segment: "transfers", title: "Transfers & Movements" },
-      "Board Disposal": { segment: "disposals", title: "Board Disposal" },
-      "Maintenance & Servicing": { segment: "maintenance", title: "Maintenance & Servicing" },
+    const map: Record<string, string> = {
+      "Physical Asset Verification": "/store-management/verification/verify",
+      "Verification of Supply": "/store-management/verification/supply",
+      "Inventory Register": "/store-management/inventory/items",
+      "Capitalisation & Issuance": "/store-management/transfers/requests",
     };
-    const target = map[moduleName];
-    if (target) drillSegment(target.segment, target.title);
+    const path = map[moduleName];
+    if (path) navigate(path);
   };
 
   const onStateRow = (stateId: number, stateName: string) => {
@@ -130,8 +142,8 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Stock Verification Unit Dashboard</h2>
-            <p className="text-xs text-muted-foreground">{unitScope.headline} — live data from verification & asset records</p>
+            <h2 className="text-xl font-bold tracking-tight">Stock Verification Dashboard</h2>
+            <p className="text-xs text-muted-foreground">{unitScope.headline} — live Store Management counts</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
@@ -149,36 +161,64 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <ClickableKpi
-                  label="Physical Asset Verifications"
-                  value={data.physical_asset_verifications ?? data.total_verifications ?? 0}
+                  label="Physical Asset Verification"
+                  value={data.tagged_assets ?? data.svo_assets ?? 0}
+                  detail={`${data.assets_never_verified ?? 0} never verified · ${data.assets_exception ?? 0} exceptions`}
+                  hint="Open physical assets"
                   icon={<ClipboardList className="w-5 h-5 text-emerald-600" />}
-                  onClick={() => drillSegment("verifications", "Physical Asset Verifications")}
+                  onClick={() => navigate("/store-management/verification/verify")}
                 />
                 <ClickableKpi
                   label="Verification of Supply"
                   value={data.supply_verifications ?? 0}
-                  icon={<Package className="w-5 h-5 text-blue-600" />}
-                  onClick={() => drillSegment("supply_verifications", "Verification of Supply")}
+                  detail={`${data.supply_failed ?? 0} failed certificates`}
+                  hint="Open verify supply"
+                  icon={<PackageCheck className="w-5 h-5 text-blue-600" />}
+                  onClick={() => navigate("/store-management/verification/supply")}
                 />
                 <ClickableKpi
-                  label="SVO Assets Registered"
-                  value={data.svo_assets ?? 0}
-                  icon={<Boxes className="w-5 h-5 text-[#25a872]" />}
-                  onClick={() => drillSegment("svo_assets", "SVO Assets Registered")}
+                  label="Inventory Register"
+                  value={data.inventory_items ?? data.inventory_catalog ?? 0}
+                  detail={`${data.inventory_low ?? 0} low stock · ${data.inventory_out ?? 0} out of stock`}
+                  hint="Open inventory"
+                  icon={<Warehouse className="w-5 h-5 text-[#25a872]" />}
+                  onClick={() => navigate("/store-management/inventory/items")}
                 />
                 <ClickableKpi
-                  label="Store Operations"
-                  value={data.store_operations ?? 0}
-                  icon={<Wrench className="w-5 h-5 text-indigo-600" />}
-                  onClick={() => drillSegment("store_operations", "Store Operations")}
+                  label="Capitalisation & Issuance"
+                  value={data.capitalisation_issuance ?? 0}
+                  detail={`${data.stock_issues ?? 0} issues · ${data.capitalisations ?? 0} capitalised`}
+                  hint="Open capitalise / issue"
+                  icon={<Send className="w-5 h-5 text-indigo-600" />}
+                  onClick={() => navigate("/store-management/transfers/requests")}
                 />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Verify supply", path: "/store-management/verification/supply", icon: PackageCheck },
+                  { label: "Physical assets", path: "/store-management/verification/verify", icon: ClipboardList },
+                  { label: "Inventory register", path: "/store-management/inventory/items", icon: Warehouse },
+                  { label: "Capitalise / issue", path: "/store-management/transfers/requests", icon: Tag },
+                ].map((link) => (
+                  <Button
+                    key={link.path}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 font-semibold border-[#d4e8dc] text-[#145c3f] hover:bg-[#e8f5ee]"
+                    onClick={() => navigate(link.path)}
+                  >
+                    <link.icon className="w-3.5 h-3.5 mr-1.5" /> {link.label}
+                  </Button>
+                ))}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card className="rounded-2xl border-[#d4e8dc]">
                   <CardHeader className="pb-2 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold">Monthly Activity</CardTitle>
-                    <DrillHint label="Physical verifications" onClick={() => drillSegment("verifications", "Physical Asset Verifications")} />
+                    <DrillHint label="Open register" onClick={() => navigate("/store-management/verification/verify")} />
                   </CardHeader>
                   <CardContent className="h-[240px]">
                     {monthlyChart.length === 0 ? (
@@ -211,14 +251,14 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Records by Module</CardTitle></CardHeader>
                   <CardContent className="h-[240px]">
                     {moduleChart.length === 0 ? (
-                      <ChartEmpty message="No stock verification or SVO records yet." />
+                      <ChartEmpty message="No Store Management records yet." />
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
                             data={moduleChart}
-                            dataKey="count" nameKey="module" cx="50%" cy="50%" outerRadius={80}
-                            label={({ module, count }) => `${module}: ${count}`}
+                            dataKey="count" nameKey="short" cx="50%" cy="50%" outerRadius={72}
+                            label={({ short, count }) => `${short}: ${count}`}
                             style={{ cursor: "pointer" }}
                             onClick={(_: any, idx: number) => {
                               const row = moduleChart[idx];
@@ -229,7 +269,8 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
                               <Cell key={i} fill={COLORS[i % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip formatter={(value: number, _n: string, p: any) => [value, p?.payload?.module]} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
@@ -287,7 +328,7 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
                 <Card className="rounded-2xl border-[#d4e8dc] lg:col-span-2">
                   <CardHeader className="pb-2 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold">Top States by Verifications</CardTitle>
-                    <DrillHint label="All physical" onClick={() => drillSegment("verifications", "Physical Asset Verifications")} />
+                    <DrillHint label="Open list" onClick={() => navigate("/store-management/verification/verify")} />
                   </CardHeader>
                   <CardContent className="p-0">
                     {(data.state_activity ?? []).length === 0 ? (

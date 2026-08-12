@@ -6,28 +6,18 @@ import { storeManagementApi } from "@/src/services/storeManagementApi";
 import { stockApi } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowLeft,
-  ClipboardCheck,
-  Loader2,
-  Tag,
-  ListOrdered,
-  User,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PHYSICAL_CONDITIONS } from "../../lib/storeOptions";
 
-const VERIFY_CONDITIONS = [...PHYSICAL_CONDITIONS, "Damaged", "Missing"] as const;
 const VERIFY_STATUSES = ["Verified & Passed", "Partial Pass", "Exception"];
 
-const STEPS = [
-  { id: 1, title: "Identity", icon: Tag },
-  { id: 2, title: "Count & condition", icon: ListOrdered },
-  { id: 3, title: "Sign-off", icon: User },
-];
+function toItemCondition(label: string) {
+  const u = String(label || "Good").toUpperCase();
+  if (["MISSING", "DAMAGED", "POOR", "FAIR", "GOOD", "DEFECTIVE", "OBSOLETE", "RETIRED"].includes(u)) return u;
+  if (u === "EXCELLENT") return "GOOD";
+  return "GOOD";
+}
 
 export default function VerifyAssetView() {
   const { assetId } = useParams<{ assetId: string }>();
@@ -37,7 +27,6 @@ export default function VerifyAssetView() {
   const [asset, setAsset] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     physicalCondition: "Good",
@@ -81,24 +70,18 @@ export default function VerifyAssetView() {
   const hasException =
     form.physicalCondition === "Missing" || Number(form.physicalCount) === 0 || variance !== 0;
 
-  const validateStep = (step: number) => {
-    setError(null);
-    if (step === 2) {
-      if (form.physicalCount < 0 || form.bookBalance < 0) {
-        setError("Counts cannot be negative.");
-        return false;
-      }
-    }
-    if (step === 3 && hasException && !form.remarks.trim()) {
-      setError("Record a remark for the variance or exception before sign-off.");
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!asset?.id) return;
-    if (!validateStep(3)) return;
+    setError(null);
+    if (form.physicalCount < 0 || form.bookBalance < 0) {
+      setError("Counts cannot be negative.");
+      return;
+    }
+    if (hasException && !form.remarks.trim()) {
+      setError("Add a remark for the variance, missing count, or exception.");
+      return;
+    }
     setSaving(true);
     try {
       const status = hasException ? "Exception" : form.verificationStatus || "Verified & Passed";
@@ -107,6 +90,14 @@ export default function VerifyAssetView() {
         physicalCondition: form.physicalCondition,
         lastVerificationDate: form.verificationDate,
         verificationStatus: status,
+        operationalStatus:
+          form.physicalCondition === "Retired"
+            ? "Retired"
+            : form.physicalCondition === "Obsolete"
+              ? "Obsolete"
+              : form.physicalCondition === "Missing"
+                ? "Missing"
+                : undefined,
       });
 
       await stockApi.createPhysicalVerification({
@@ -125,16 +116,7 @@ export default function VerifyAssetView() {
             custodian: asset.assignedCustodian || asset.custodian,
             bookBalance: Number(form.bookBalance) || 1,
             physicalCount: Number(form.physicalCount) || 0,
-            condition:
-              form.physicalCondition === "Missing"
-                ? "MISSING"
-                : form.physicalCondition === "Damaged"
-                  ? "DAMAGED"
-                  : form.physicalCondition === "Poor"
-                    ? "POOR"
-                    : form.physicalCondition === "Fair"
-                      ? "FAIR"
-                      : "GOOD",
+            condition: toItemCondition(form.physicalCondition),
             remarks: form.remarks,
           },
         ],
@@ -150,17 +132,13 @@ export default function VerifyAssetView() {
   };
 
   const inputCls =
-    "w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25a872]/40 disabled:bg-slate-50";
-  const labelCls = "block text-[11px] font-semibold text-slate-600 mb-1.5";
+    "w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25a872]/40 disabled:bg-slate-50";
+  const labelCls = "block text-[11px] font-semibold text-slate-600 mb-1";
 
   if (loading) {
     return (
       <PageLayout title="Verify Asset" description="Loading…">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-40 rounded-lg border border-slate-200 bg-slate-50 animate-pulse" />
-          ))}
-        </div>
+        <div className="h-48 rounded-lg border border-slate-200 bg-slate-50 animate-pulse" />
       </PageLayout>
     );
   }
@@ -197,217 +175,137 @@ export default function VerifyAssetView() {
           <ArrowLeft className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Back to list
         </Button>
       }
+      contentClassName="gap-3"
     >
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden w-full">
-        <div className="bg-[#145c3f] text-white p-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold tracking-tight">Physical inspection</h2>
-            <p className="text-xs text-emerald-100/90">Confirm identity, count, and condition against the register</p>
-          </div>
-          <span className="px-3 py-1 rounded text-xs font-mono font-bold bg-white/10 text-emerald-200 border border-white/20" translate="no">
-            {tag}
+      <form onSubmit={handleSubmit} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-200 bg-[#f4f7f5] px-4 py-3">
+          <span className="font-mono text-sm font-bold text-[#145c3f]" translate="no">{tag}</span>
+          <span className="text-sm font-semibold text-slate-900">{asset.name}</span>
+          <span className="text-xs text-slate-600">{asset.primaryCategory || asset.category || "—"}</span>
+          <span className="text-xs text-slate-600">{asset.assignedCustodian || asset.custodian || "Unassigned"}</span>
+          <span className="text-xs text-slate-600">{asset.officeDeptUnit || asset.location || "—"}</span>
+          <span className="ml-auto text-[11px] font-semibold text-slate-500 tabular-nums">
+            Last verified {asset.lastVerificationDate || "Never"}
           </span>
         </div>
 
-        <div className="bg-[#f4f7f5] border-b border-slate-200 flex overflow-x-auto">
-          {STEPS.map((step) => {
-            const Icon = step.icon;
-            const isActive = currentStep === step.id;
-            const isDone = currentStep > step.id;
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => {
-                  if (step.id < currentStep || validateStep(currentStep)) setCurrentStep(step.id);
-                }}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold whitespace-nowrap border-r border-slate-200 ${
-                  isActive ? "bg-white text-[#145c3f] border-b-2 border-b-[#145c3f]" : isDone ? "text-[#145c3f]" : "text-slate-600"
-                }`}
+        <div className="p-4 space-y-3">
+          {error ? (
+            <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> {error}
+            </div>
+          ) : null}
+
+          {hasException ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+              Variance or missing count will be recorded as an exception. Add a remark before saving.
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div>
+              <label className={labelCls} htmlFor="book-balance">Book</label>
+              <input
+                id="book-balance"
+                name="bookBalance"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                className={`${inputCls} tabular-nums`}
+                value={form.bookBalance}
+                onChange={(e) => setForm((p) => ({ ...p, bookBalance: Number(e.target.value) || 0 }))}
+              />
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="physical-count">Physical</label>
+              <input
+                id="physical-count"
+                name="physicalCount"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                className={`${inputCls} tabular-nums`}
+                value={form.physicalCount}
+                onChange={(e) => setForm((p) => ({ ...p, physicalCount: Number(e.target.value) || 0 }))}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Variance</label>
+              <p className={`h-9 flex items-center px-3 rounded-lg border text-sm font-semibold tabular-nums ${
+                variance !== 0 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"
+              }`}>
+                {variance}
+              </p>
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="condition">Condition</label>
+              <select
+                id="condition"
+                name="physicalCondition"
+                className={inputCls}
+                value={form.physicalCondition}
+                onChange={(e) => setForm((p) => ({ ...p, physicalCondition: e.target.value }))}
               >
-                <Icon className={`h-4 w-4 ${isActive || isDone ? "text-[#25a872]" : "text-slate-400"}`} aria-hidden="true" />
-                {step.id}. {step.title}
-              </button>
-            );
-          })}
-        </div>
-
-        {error && (
-          <div role="alert" className="m-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-md text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> {error}
-          </div>
-        )}
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (currentStep < 3) {
-              if (validateStep(currentStep)) setCurrentStep((s) => s + 1);
-            } else handleSubmit();
-          }}
-          className="p-6 space-y-5"
-        >
-          {currentStep === 1 && (
-            <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-              <div className="min-w-0">
-                <dt className={labelCls}>Name</dt>
-                <dd className="font-semibold text-slate-900 break-words">{asset.name}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className={labelCls}>Tag</dt>
-                <dd className="font-mono font-semibold text-[#145c3f]">{tag}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className={labelCls}>Category</dt>
-                <dd className="font-medium text-slate-900">{asset.primaryCategory || asset.category || "—"}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className={labelCls}>Custodian</dt>
-                <dd className="font-medium text-slate-900">{asset.assignedCustodian || asset.custodian || "—"}</dd>
-              </div>
-              <div className="sm:col-span-2 min-w-0">
-                <dt className={labelCls}>Location</dt>
-                <dd className="font-medium text-slate-900">
-                  {asset.officeDeptUnit || asset.department || asset.location || "—"}
-                </dd>
-              </div>
-              <div className="min-w-0">
-                <dt className={labelCls}>Last verified</dt>
-                <dd className="font-medium text-slate-900 tabular-nums">{asset.lastVerificationDate || "Never"}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className={labelCls}>Current status</dt>
-                <dd className="font-medium text-slate-900">{asset.verificationStatus || asset.operationalStatus || "—"}</dd>
-              </div>
-            </dl>
-          )}
-
-          {currentStep === 2 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              <div>
-                <label className={labelCls} htmlFor="book-balance">Book balance</label>
-                <input
-                  id="book-balance"
-                  name="bookBalance"
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  className={`${inputCls} tabular-nums`}
-                  value={form.bookBalance}
-                  onChange={(e) => setForm((p) => ({ ...p, bookBalance: Number(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="physical-count">Physical count found</label>
-                <input
-                  id="physical-count"
-                  name="physicalCount"
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  className={`${inputCls} tabular-nums`}
-                  value={form.physicalCount}
-                  onChange={(e) => setForm((p) => ({ ...p, physicalCount: Number(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Variance</label>
-                <p className={`h-10 flex items-center px-3 rounded-lg border text-sm font-semibold tabular-nums ${
-                  variance !== 0 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"
-                }`}>
-                  {variance}
-                </p>
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="condition">Condition</label>
-                <select
-                  id="condition"
-                  name="physicalCondition"
-                  className={inputCls}
-                  value={form.physicalCondition}
-                  onChange={(e) => setForm((p) => ({ ...p, physicalCondition: e.target.value }))}
-                >
-                  {VERIFY_CONDITIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
+                {PHYSICAL_CONDITIONS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {hasException && (
-                <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
-                  Variance or missing count will be recorded as an exception. Add a remark before sign-off.
-                </div>
-              )}
-              <div>
-                <label className={labelCls} htmlFor="verify-status">Verification status</label>
-                <select
-                  id="verify-status"
-                  name="verificationStatus"
-                  className={inputCls}
-                  value={hasException ? "Exception" : form.verificationStatus}
-                  disabled={hasException}
-                  onChange={(e) => setForm((p) => ({ ...p, verificationStatus: e.target.value }))}
-                >
-                  {VERIFY_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="verify-date">Verification date</label>
-                <input
-                  id="verify-date"
-                  name="verificationDate"
-                  type="date"
-                  className={inputCls}
-                  value={form.verificationDate}
-                  onChange={(e) => setForm((p) => ({ ...p, verificationDate: e.target.value }))}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="remarks">
-                  Remarks {hasException ? <span className="text-rose-500">*</span> : null}
-                </label>
-                <textarea
-                  id="remarks"
-                  name="remarks"
-                  className={`${inputCls} h-28 py-2.5`}
-                  value={form.remarks}
-                  onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
-                  placeholder="Condition notes, location changes, missing parts…"
-                />
-              </div>
-              <div>
-                <p className={labelCls}>Inspecting officer</p>
-                <p className="h-10 flex items-center px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-900">
-                  {user?.name || "Officer"}
-                </p>
-              </div>
+            <div>
+              <label className={labelCls} htmlFor="verify-status">Status</label>
+              <select
+                id="verify-status"
+                name="verificationStatus"
+                className={inputCls}
+                value={hasException ? "Exception" : form.verificationStatus}
+                disabled={hasException}
+                onChange={(e) => setForm((p) => ({ ...p, verificationStatus: e.target.value }))}
+              >
+                {VERIFY_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
-          )}
-
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-            <Button type="button" variant="outline" className="text-xs" disabled={currentStep === 1} onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}>
-              <ChevronLeft className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Previous
-            </Button>
-            {currentStep < 3 ? (
-              <Button type="submit" className="bg-[#145c3f] hover:bg-[#0f3d2e] text-white text-xs font-bold">
-                Next <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button type="submit" disabled={saving} className="bg-[#145c3f] hover:bg-[#0f3d2e] text-white text-xs font-bold min-w-[180px]">
+            <div>
+              <label className={labelCls} htmlFor="verify-date">Date</label>
+              <input
+                id="verify-date"
+                name="verificationDate"
+                type="date"
+                className={inputCls}
+                value={form.verificationDate}
+                onChange={(e) => setForm((p) => ({ ...p, verificationDate: e.target.value }))}
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-3 lg:col-span-4">
+              <label className={labelCls} htmlFor="remarks">
+                Remarks {hasException ? <span className="text-rose-500">*</span> : null}
+              </label>
+              <input
+                id="remarks"
+                name="remarks"
+                className={inputCls}
+                value={form.remarks}
+                onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
+                placeholder="Condition notes, location changes, missing parts…"
+              />
+            </div>
+            <div>
+              <p className={labelCls}>Officer</p>
+              <p className="h-9 flex items-center px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-900 truncate">
+                {user?.name || "Officer"}
+              </p>
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" disabled={saving} className="w-full h-9 bg-[#145c3f] hover:bg-[#0f3d2e] text-white text-xs font-bold">
                 {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden="true" /> : <ClipboardCheck className="h-4 w-4 mr-1.5" aria-hidden="true" />}
-                {saving ? "Saving…" : "Save verification"}
+                {saving ? "Saving…" : "Save"}
               </Button>
-            )}
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </PageLayout>
   );
 }
