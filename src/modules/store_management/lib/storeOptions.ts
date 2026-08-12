@@ -182,7 +182,17 @@ export function getSupplySubcategories(nature: (typeof SUPPLY_NATURES)[number], 
   return STORE_SUBCATEGORIES[nature] || [];
 }
 
-export const PHYSICAL_CONDITIONS = ["Excellent", "Good", "Fair", "Poor", "Defective"] as const;
+export const PHYSICAL_CONDITIONS = [
+  "Excellent",
+  "Good",
+  "Fair",
+  "Poor",
+  "Defective",
+  "Damaged",
+  "Missing",
+  "Obsolete",
+  "Retired",
+] as const;
 
 export const VERIFICATION_STATUSES = [
   { value: "VERIFIED_PASSED", label: "Verified & Passed" },

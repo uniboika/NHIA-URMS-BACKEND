@@ -7,6 +7,7 @@ import { Eye, PackageCheck } from "lucide-react";
 import PageLayout from "../components/PageLayout";
 import { matchesStore, storeNameFromState, SELECT_CLS, LABEL_CLS } from "../lib/storeOptions";
 import ListSearchBar from "../components/ListSearchBar";
+import MetricCards from "../components/MetricCards";
 
 type Option = { id: number; label: string };
 
@@ -81,6 +82,26 @@ export default function InventoryItemsView() {
     }
     return list;
   }, [items, storeLabel, q]);
+
+  const metrics = useMemo(() => {
+    const skus = filtered.length;
+    const units = filtered.reduce((s, i) => s + Number(i.quantityInStock || 0), 0);
+    const value = filtered.reduce((s, i) => s + Number(i.quantityInStock || 0) * Number(i.unitPrice || 0), 0);
+    let low = 0;
+    let out = 0;
+    for (const i of filtered) {
+      const tone = stockTone(i);
+      if (tone.label === "Out of stock") out += 1;
+      else if (tone.label === "Low stock") low += 1;
+    }
+    const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
+    return [
+      { label: "SKUs", value: skus, hint: "Catalog items" },
+      { label: "Units on hand", value: units, hint: naira.format(value) + " stock value", tone: "ok" as const },
+      { label: "Low stock", value: low, hint: "At or below reorder", tone: low ? "warn" as const : "default" as const },
+      { label: "Out of stock", value: out, hint: "Zero quantity", tone: out ? "bad" as const : "default" as const },
+    ];
+  }, [filtered]);
 
   const setParam = (key: string, val: string) => {
     const next = new URLSearchParams(searchParams);
@@ -160,7 +181,10 @@ export default function InventoryItemsView() {
           <PackageCheck className="w-4 h-4 mr-1.5" aria-hidden="true" /> Receive stock
         </Button>
       }
+      contentClassName="gap-3"
     >
+      <MetricCards items={metrics} />
+
       <div className="flex flex-wrap items-end gap-4">
         <ListSearchBar
           value={q}

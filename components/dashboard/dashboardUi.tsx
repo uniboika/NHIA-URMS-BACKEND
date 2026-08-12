@@ -32,13 +32,15 @@ export function getUnitHeadScope(
 }
 
 export function ClickableKpi({
-  label, value, icon, onClick, drillable = true,
+  label, value, icon, onClick, drillable = true, hint, detail,
 }: {
   label: string;
   value: string | number;
   icon: React.ReactNode;
   onClick?: () => void;
   drillable?: boolean;
+  hint?: string;
+  detail?: string;
 }) {
   const Tag = drillable && onClick ? "button" : "div";
   return (
@@ -53,9 +55,12 @@ export function ClickableKpi({
         <div className="mb-2">{icon}</div>
         <p className="text-xl font-black text-slate-800">{value}</p>
         <p className="text-[10px] font-semibold text-slate-500 mt-1 leading-tight">{label}</p>
+        {detail ? (
+          <p className="text-[10px] font-medium text-slate-500 mt-1 leading-tight">{detail}</p>
+        ) : null}
         {drillable && onClick && (
           <p className="text-[9px] text-[#25a872] font-semibold mt-1.5 flex items-center gap-0.5">
-            Click to drill down <ChevronRight className="w-3 h-3" />
+            {hint || "Click to drill down"} <ChevronRight className="w-3 h-3" />
           </p>
         )}
       </Tag>

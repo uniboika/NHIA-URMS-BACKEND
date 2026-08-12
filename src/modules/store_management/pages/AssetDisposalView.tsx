@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { stockApi } from "@/lib/api";
 import CustomTable, { CustomTableField } from "@/components/CustomTable";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/src/store/store";
 
 export default function AssetDisposalView() {
+  const [searchParams] = useSearchParams();
   const user = useSelector((s: RootState) => s.auth.user);
   const [rows, setRows] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
@@ -43,6 +45,31 @@ export default function AssetDisposalView() {
     load();
     stockApi.getStoreAssets().then((r) => setAssets(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   }, [load]);
+
+  useEffect(() => {
+    const assetId = searchParams.get("assetId") || "";
+    const reason = searchParams.get("reason") || "";
+    if (!assetId && !reason) return;
+    setShowForm(true);
+    setForm((p) => ({
+      ...p,
+      assetId: assetId || p.assetId,
+      reason: reason || p.reason,
+    }));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const assetId = searchParams.get("assetId");
+    if (!assetId || !assets.length) return;
+    const a = assets.find((x) => String(x.id) === assetId);
+    if (!a) return;
+    setForm((p) => ({
+      ...p,
+      assetId: String(a.id),
+      assetNumber: a.assetId || a.assetNumber || "",
+      assetName: a.name || "",
+    }));
+  }, [assets, searchParams]);
 
   useEffect(() => {
     if (user?.name) setForm((p) => ({ ...p, approvedBy: p.approvedBy || user.name }));
