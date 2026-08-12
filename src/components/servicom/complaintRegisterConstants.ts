@@ -72,10 +72,66 @@ export const COMPLAINT_OUTCOMES = [
   "Information/Advice Provided", "Duplicate Complaint", "Complaint Withdrawn",
 ].map(v => ({ value: v, label: v }));
 
+export type ComplaintSlaColor = "white" | "yellow" | "amber" | "red";
+
+export interface ComplaintSlaFlag {
+  code: string;
+  label: string;
+}
+
+export interface ComplaintSlaState {
+  color: ComplaintSlaColor;
+  working_days_elapsed: number;
+  message: string | null;
+  flags: ComplaintSlaFlag[];
+  acknowledged: boolean;
+  investigation_commenced: boolean;
+  escalated: boolean;
+  closed: boolean;
+}
+
+export interface ComplaintSlaRuleRow {
+  priority: string;
+  acknowledge_days: number;
+  investigation_commence_days: number;
+  escalate_after_days: number;
+  target_resolution_days: number;
+  acknowledge: string;
+  investigate: string;
+  escalate: string;
+  resolve: string;
+}
+
+export function slaRowClass(color?: ComplaintSlaColor | string) {
+  switch (color) {
+    case "yellow": return "bg-yellow-50/90 hover:bg-yellow-100/90";
+    case "amber": return "bg-amber-50/90 hover:bg-amber-100/90";
+    case "red": return "bg-red-50/90 hover:bg-red-100/90";
+    default: return "bg-white hover:bg-[#f8fbf9]/80";
+  }
+}
+
+export function slaColorBadgeClass(color?: ComplaintSlaColor | string) {
+  switch (color) {
+    case "yellow": return "bg-yellow-100 text-yellow-900 border-yellow-300";
+    case "amber": return "bg-amber-100 text-amber-900 border-amber-300";
+    case "red": return "bg-red-100 text-red-900 border-red-300";
+    default: return "bg-white text-slate-600 border-slate-200";
+  }
+}
+
+export function slaColorLabel(color?: ComplaintSlaColor | string) {
+  switch (color) {
+    case "yellow": return "Yellow";
+    case "amber": return "Amber";
+    case "red": return "Red";
+    default: return "White";
+  }
+}
 export const SLA_SUMMARY = [
-  { priority: "Top", acknowledge: "1 day", investigate: "1 day", escalate: "3 days", resolve: "5 days" },
-  { priority: "High", acknowledge: "1 day", investigate: "2 days", escalate: "7 days", resolve: "10 days" },
-  { priority: "Medium", acknowledge: "2 days", investigate: "3 days", escalate: "14 days", resolve: "20 days" },
+  { priority: "Top", acknowledge: "Within 1 working day", investigate: "Within 1 working day", escalate: "3 working days", resolve: "5 working days" },
+  { priority: "High", acknowledge: "Within 1 working day", investigate: "Within 2 working days", escalate: "7 working days", resolve: "10 working days" },
+  { priority: "Medium", acknowledge: "Within 2 working days", investigate: "Within 3 working days", escalate: "14 working days", resolve: "20 working days" },
 ];
 
 export function monthLabel(value: number | string) {
@@ -113,7 +169,9 @@ export function computeResolutionPreview(
   return { resolution_days, resolution_within_sla };
 }
 
-export function slaForPriority(priority: string) {
+export function slaForPriority(priority: string, rules?: ComplaintSlaRuleRow[]) {
+  const fromApi = rules?.find((s) => s.priority === priority);
+  if (fromApi) return fromApi;
   return SLA_SUMMARY.find((s) => s.priority === priority) ?? null;
 }
 
@@ -135,12 +193,11 @@ export const COMPLAINT_LIFECYCLE: {
   id: LifecycleStage;
   label: string;
   shortLabel: string;
-  description: string;
 }[] = [
-  { id: "registration", label: "1. Complaint", shortLabel: "Complaint", description: "Register the complaint" },
-  { id: "investigation", label: "2. Investigation", shortLabel: "Investigation", description: "Record investigation progress" },
-  { id: "escalation", label: "3. Escalation", shortLabel: "Escalation", description: "Escalate when required" },
-  { id: "resolution", label: "4. Resolution", shortLabel: "Resolution", description: "Close and resolve" },
+  { id: "registration", label: "Complaint", shortLabel: "Complaint" },
+  { id: "investigation", label: "Investigation", shortLabel: "Investigation" },
+  { id: "escalation", label: "Escalation", shortLabel: "Escalation" },
+  { id: "resolution", label: "Resolution", shortLabel: "Resolution" },
 ];
 
 export const INVESTIGATION_STATUSES = COMPLAINT_STATUSES.filter((s) =>
@@ -176,4 +233,26 @@ export function getStageCompletion(row: any): Record<LifecycleStage, boolean> {
 
 export function lifecycleStageLabel(stage: LifecycleStage) {
   return COMPLAINT_LIFECYCLE.find((s) => s.id === stage)?.shortLabel ?? stage;
+}
+
+const STAGE_ORDER: LifecycleStage[] = ["registration", "investigation", "escalation", "resolution"];
+
+export function nextLifecycleStage(current: LifecycleStage): LifecycleStage {
+  const idx = STAGE_ORDER.indexOf(current);
+  if (idx < 0 || idx >= STAGE_ORDER.length - 1) return current;
+  return STAGE_ORDER[idx + 1];
+}
+
+export function priorLifecycleStages(active: LifecycleStage): LifecycleStage[] {
+  const idx = STAGE_ORDER.indexOf(active);
+  if (idx <= 0) return [];
+  return STAGE_ORDER.slice(0, idx);
+}
+
+export const CLOSED_COMPLAINT_STATUSES = [
+  "Resolved", "Closed", "Referred to Appropriate Authority", "Complaint Withdrawn",
+] as const;
+
+export function isComplaintClosed(status?: string) {
+  return !!status && CLOSED_COMPLAINT_STATUSES.includes(status as typeof CLOSED_COMPLAINT_STATUSES[number]);
 }

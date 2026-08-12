@@ -111,3 +111,8 @@ export function computeCommentCardScore(responses: Record<string, string>) {
 export function commentCardScaleOptions(scale: "5" | "4") {
   return scale === "5" ? COMMENT_CARD_SCALE_5 : COMMENT_CARD_SCALE_4;
 }
+
+/** User-facing label without numeric score suffix */
+export function commentCardResponseLabel(label: string) {
+  return label.replace(/\s*\(\d+\)$/, "");
+}

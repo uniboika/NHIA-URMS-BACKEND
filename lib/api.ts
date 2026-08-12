@@ -478,6 +478,9 @@ export const servicomApi = {
   listComplaints: (filters?: Record<string, string | undefined>) =>
     request<{ success: boolean; data: any[] }>(`/servicom/complaints${servicomFilters(filters)}`),
 
+  listComplaintSla: () =>
+    request<{ success: boolean; data: any[] }>("/servicom/complaint-sla"),
+
   getComplaint: (id: number | string) =>
     request<{ success: boolean; data: any }>(`/servicom/complaints/${id}`),
 

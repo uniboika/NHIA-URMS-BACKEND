@@ -121,7 +121,6 @@ const ICON_MAP: Record<string, React.ElementType> = {
   "Asset Management (SVO)": Warehouse,
   SERVICOM: Megaphone,
   "SPECIAL PROJECT": FileSpreadsheet,
-  "SPECIAL PROJECT": FileSpreadsheet,
   "Special Project": FileSpreadsheet,
   "STATE OFFICE COORDINATION": Building,
   "State Offices": Building,

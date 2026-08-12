@@ -22,7 +22,9 @@ import {
   COMPLAINT_OUTCOMES, SLA_SUMMARY, domainCodeFromDomain, computeResolutionPreview,
   slaForPriority, STATUS_BADGE_CLASS, COMPLAINT_LIFECYCLE, INVESTIGATION_STATUSES,
   lifecycleStageFromStatus, getStageCompletion, lifecycleStageLabel,
-  type LifecycleStage,
+  nextLifecycleStage, priorLifecycleStages, isComplaintClosed,
+  slaColorBadgeClass, slaColorLabel,
+  type LifecycleStage, type ComplaintSlaRuleRow,
 } from "./complaintRegisterConstants";
 import { HCF_CLASSIFICATION_GUIDE } from "./hcfClassificationGuide";
 
@@ -100,10 +102,67 @@ function rowToForm(row: any) {
 
 function AutoField({ label, value, hint }: { label: string; value?: string | number | null; hint?: string }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-slate-500">{label}</Label>
-      <p className="text-sm font-medium text-slate-700">{value ?? "—"}</p>
+    <div className="space-y-1">
+      <Label className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">{label}</Label>
+      <p className="text-sm font-semibold text-slate-800">{value ?? "—"}</p>
       {hint && !value && <p className="text-[10px] text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
+/** Compact read-only display for auto-derived complaint fields */
+function SummaryField({ label, value, fullWidth }: { label: string; value?: string | null; fullWidth?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className={fullWidth ? "md:col-span-2" : undefined}>
+      <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">{label}</p>
+      <p className="text-sm font-semibold text-slate-900 leading-snug mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function StageSummaryCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+      <CardHeader className="pb-2 pt-4 px-5 border-b border-slate-100">
+        <CardTitle className="text-xs font-black uppercase tracking-wide text-slate-600">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 px-5 py-4">
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Compact read-only display for auto-derived complaint fields */
+function DerivedField({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">{label}</p>
+      <p className="text-sm font-semibold text-black leading-snug">{value}</p>
+    </div>
+  );
+}
+
+function DerivedTextBlock({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="rounded-lg bg-[#f8fbf9] border border-[#d4e8dc]/80 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium mb-0.5">{label}</p>
+      <p className="text-xs text-slate-700 leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
+function SlaHint({ priority, slaRow }: { priority?: string; slaRow: ReturnType<typeof slaForPriority> }) {
+  if (!priority || !slaRow) return null;
+  return (
+    <div className="md:col-span-2 pt-3 mt-1 border-t border-[#d4e8dc]">
+      <p className="text-[11px] text-slate-500 leading-relaxed">
+        <span className="font-semibold text-[#145c3f]">{priority} priority SLA — </span>
+        Acknowledge {slaRow.acknowledge}; investigation commences {slaRow.investigate}; escalate after {slaRow.escalate}; target resolution {slaRow.resolve}.
+      </p>
     </div>
   );
 }
@@ -124,10 +183,11 @@ function FieldSelect({
   placeholder?: string;
 }) {
   if (readOnly) {
+    const display = pickLabel(options, value, value || "—");
     return (
       <div className="space-y-1.5">
         <Label className="text-xs text-slate-500">{label}</Label>
-        <p className="text-sm font-medium">{value || "—"}</p>
+        <p className="text-sm font-medium text-slate-900">{display || "—"}</p>
       </div>
     );
   }
@@ -218,8 +278,15 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
   const [filterSearch, setFilterSearch] = React.useState("");
   const [filterDate, setFilterDate] = React.useState("");
   const [activeStage, setActiveStage] = React.useState<LifecycleStage>("registration");
+  const [slaRules, setSlaRules] = React.useState<ComplaintSlaRuleRow[]>(SLA_SUMMARY as ComplaintSlaRuleRow[]);
 
   const set = (key: string, value: string | boolean) => setF((p) => ({ ...p, [key]: value }));
+
+  React.useEffect(() => {
+    servicomApi.listComplaintSla()
+      .then((r) => { if (r.data?.length) setSlaRules(r.data); })
+      .catch(() => {});
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -287,7 +354,30 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     return <Badge variant="outline" className={`text-[10px] font-semibold ${cls}`}>{priority}</Badge>;
   };
 
-  const stageBadge = (c: any) => {
+  const renderOverdueCell = (c: any) => {
+    const sla = c.sla;
+    if (!sla) return <span className="text-xs text-slate-400">—</span>;
+    const flags = sla.flags ?? [];
+    return (
+      <div className="space-y-1 min-w-[140px]">
+        <Badge variant="outline" className={`text-[10px] font-bold ${slaColorBadgeClass(sla.color)}`}>
+          {slaColorLabel(sla.color)}
+        </Badge>
+        {flags.length === 0 ? (
+          <p className="text-[10px] font-semibold text-emerald-700">None</p>
+        ) : (
+          flags.map((flag: { code: string; label: string }) => (
+            <p key={flag.code} className="text-[10px] font-bold text-rose-700 flex items-start gap-1 leading-snug">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>{flag.label}</span>
+            </p>
+          ))
+        )}
+      </div>
+    );
+  };
+
+  const stageBadge = (c: any, emphasis = false) => {
     const stage = lifecycleStageFromStatus(c.status, c);
     const cls = stage === "registration"
       ? "bg-blue-50 text-blue-700 border-blue-200"
@@ -297,7 +387,7 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
           ? "bg-purple-50 text-purple-800 border-purple-200"
           : "bg-emerald-50 text-emerald-800 border-emerald-200";
     return (
-      <Badge variant="outline" className={`text-[10px] font-semibold ${cls}`}>
+      <Badge variant="outline" className={`${emphasis ? "text-xs font-black px-2.5 py-1" : "text-[10px] font-semibold"} ${cls}`}>
         {lifecycleStageLabel(stage)}
       </Badge>
     );
@@ -315,7 +405,8 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
       const res = await servicomApi.getComplaint(row.id);
       setSelected(res.data);
       setF(rowToForm(res.data));
-      setActiveStage(stage ?? lifecycleStageFromStatus(res.data.status, res.data));
+      const current = lifecycleStageFromStatus(res.data.status, res.data);
+      setActiveStage(stage ?? nextLifecycleStage(current));
       setMode("manage");
     } catch (err: any) {
       toast.error("Failed to load complaint", { description: err.message });
@@ -336,8 +427,8 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     setF(rowToForm(res.data));
   };
 
-  const statusBadge = (status: string) => (
-    <Badge variant="outline" className={`text-[10px] font-semibold ${STATUS_BADGE_CLASS[status] ?? ""}`}>
+  const statusBadge = (status: string, emphasis = false) => (
+    <Badge variant="outline" className={`${emphasis ? "text-xs font-black px-2.5 py-1" : "text-[10px] font-semibold"} ${STATUS_BADGE_CLASS[status] ?? ""}`}>
       {status}
     </Badge>
   );
@@ -507,24 +598,25 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     const isManualType = readOnly
       ? row?.complaint_type && row.complaint_type !== "HCF"
       : f.complaint_type && f.complaint_type !== "HCF";
+    const offenceSelected = isHcf && !!(readOnly ? row?.offence_reference : f.offence_reference);
+    const showReceiptFields = isManualType || offenceSelected;
 
     const priority = readOnly ? row?.priority_rating : f.priority_rating;
+    const domain = readOnly ? row?.complaint_domain : f.complaint_domain;
+    const category = readOnly ? (row?.complaint_category ?? row?.category) : f.complaint_category;
     const dateReceived = readOnly ? (row?.date_received ?? row?.complaint_date) : f.date_received;
     const transmissionRoute = readOnly ? row?.transmission_route : f.transmission_route;
     const offenceText = readOnly ? row?.description : f.description;
-    const complaintId = readOnly ? row?.complaint_number : selected?.complaint_number;
-    const slaRow = slaForPriority(priority ?? "");
+    const slaRow = slaForPriority(priority ?? "", slaRules);
 
     return (
       <Card className="rounded-2xl border-[#d4e8dc] shadow-sm">
         <CardHeader className="pb-3 border-b bg-[#f8fbf9]">
           <CardTitle className="text-sm font-bold text-[#145c3f]">Complaint</CardTitle>
         </CardHeader>
-        <CardContent className="pt-5 pb-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {readOnly ? (
+        <CardContent className="pt-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+          {readOnly && (
             <AutoField label="Complaint ID" value={row?.complaint_number} />
-          ) : (
-            <DisabledInput label="Complaint ID" value={complaintId} placeholder="Auto-generated" />
           )}
 
           {renderGeoFields(readOnly, row)}
@@ -538,70 +630,176 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
           />
 
           {isHcf && (
-            <FieldSelect
-              label="Offence / Complaint"
-              value={readOnly ? row?.offence_reference : f.offence_reference}
-              options={HCF_OFFENCE_OPTIONS}
-              readOnly={readOnly}
-              onChange={onHcfOffenceChange}
-              placeholder="Select offence"
-            />
-          )}
-
-          {isHcf && (readOnly ? row?.offence_reference : f.offence_reference) && (
-            <>
-              <DisabledInput label="Domain" value={readOnly ? row?.complaint_domain : f.complaint_domain} />
-              <DisabledInput label="Category" value={readOnly ? (row?.complaint_category ?? row?.category) : f.complaint_category} />
-            </>
+            <div className={geoLocked ? "md:col-span-2" : undefined}>
+              <FieldSelect
+                label="Offence / Complaint"
+                value={readOnly ? row?.offence_reference : f.offence_reference}
+                options={HCF_OFFENCE_OPTIONS}
+                readOnly={readOnly}
+                onChange={onHcfOffenceChange}
+                placeholder="Select offence"
+              />
+            </div>
           )}
 
           {isManualType && (
             <>
-              <FieldSelect label="Domain" value={readOnly ? row?.complaint_domain : f.complaint_domain}
-                options={COMPLAINT_DOMAINS} readOnly={readOnly}
-                onChange={(v) => setF((p) => ({ ...p, complaint_domain: v, domain_code: domainCodeFromDomain(v) }))} />
-              <FieldSelect label="Category" value={readOnly ? (row?.complaint_category ?? row?.category) : f.complaint_category}
-                options={COMPLAINT_CATEGORIES} readOnly={readOnly} onChange={(v) => set("complaint_category", v)} />
+              <FieldSelect
+                label="Domain"
+                value={domain ?? ""}
+                options={COMPLAINT_DOMAINS}
+                readOnly={readOnly}
+                onChange={(v) => setF((p) => ({ ...p, complaint_domain: v, domain_code: domainCodeFromDomain(v) }))}
+              />
+              <FieldSelect
+                label="Category"
+                value={category ?? ""}
+                options={COMPLAINT_CATEGORIES}
+                readOnly={readOnly}
+                onChange={(v) => set("complaint_category", v)}
+              />
+              <FieldSelect
+                label="Priority Rating"
+                value={priority ?? ""}
+                options={PRIORITY_RATINGS}
+                readOnly={readOnly}
+                onChange={(v) => set("priority_rating", v)}
+              />
             </>
           )}
 
-          {(isHcf || isManualType) && (
+          {offenceSelected && (
+            <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg bg-[#f8fbf9] border border-[#d4e8dc] px-3 py-2.5">
+              <DerivedField label="Domain" value={domain} />
+              <DerivedField label="Category" value={category} />
+              <DerivedField label="Priority" value={priority} />
+            </div>
+          )}
+
+          {offenceSelected && offenceText && (
+            <div className="md:col-span-2">
+              <DerivedTextBlock label="Offence" value={offenceText} />
+            </div>
+          )}
+
+          {showReceiptFields && (
             <>
-              {isHcf ? (
-                <DisabledInput label="Priority Rating" value={priority} />
-              ) : (
-                <FieldSelect label="Priority Rating" value={priority ?? ""}
-                  options={PRIORITY_RATINGS} readOnly={readOnly} onChange={(v) => set("priority_rating", v)} />
-              )}
-              <FieldText label="Date Received" type="date" value={dateReceived ?? ""}
-                onChange={(v) => set("date_received", v)} readOnly={readOnly} />
-              <FieldSelect label="Transmission Route" value={transmissionRoute ?? ""}
-                options={TRANSMISSION_ROUTES} readOnly={readOnly} onChange={(v) => set("transmission_route", v)} />
+              <FieldText
+                label="Date Received"
+                type="date"
+                value={dateReceived ?? ""}
+                onChange={(v) => set("date_received", v)}
+                readOnly={readOnly}
+              />
+              <FieldSelect
+                label="Transmission Route"
+                value={transmissionRoute ?? ""}
+                options={TRANSMISSION_ROUTES}
+                readOnly={readOnly}
+                onChange={(v) => set("transmission_route", v)}
+              />
             </>
           )}
 
-          {(isHcf || isManualType) && (
-            <div className="md:col-span-2 xl:col-span-3">
-              {readOnly || isHcf ? (
-                <DisabledInput label="Offence" value={offenceText} />
-              ) : (
-                <FieldText label="Offence" value={offenceText ?? ""}
-                  onChange={(v) => set("description", v)} readOnly={readOnly} />
-              )}
+          {isManualType && !readOnly && (
+            <div className="md:col-span-2">
+              <FieldText
+                label="Offence"
+                value={offenceText ?? ""}
+                onChange={(v) => set("description", v)}
+                readOnly={readOnly}
+              />
             </div>
           )}
 
-          {slaRow && (
-            <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-[#d4e8dc] bg-[#f8fbf9] p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <DisabledInput label="Acknowledge within" value={slaRow.acknowledge} />
-              <DisabledInput label="Investigate within" value={slaRow.investigate} />
-              <DisabledInput label="Escalate after" value={slaRow.escalate} />
-              <DisabledInput label="Resolve within" value={slaRow.resolve} />
+          {isManualType && readOnly && offenceText && (
+            <div className="md:col-span-2">
+              <DerivedTextBlock label="Offence" value={offenceText} />
             </div>
+          )}
+
+          {(showReceiptFields || (readOnly && priority)) && (
+            <SlaHint priority={priority} slaRow={slaRow} />
           )}
         </CardContent>
       </Card>
     );
+  };
+
+  const zoneLabel = (row?: any) =>
+    row?.zone?.description ?? pickGeoLabel(zones, String(row?.zone_id ?? ""), "—");
+  const stateLabel = (row?: any) =>
+    row?.state?.description ?? pickGeoLabel(states.length ? states : filterStates, String(row?.state_id ?? ""), "—");
+
+  const renderRegistrationSummary = (row?: any) => {
+    if (!row) return null;
+    const offenceRef = row.offence_reference
+      ? HCF_CLASSIFICATION_GUIDE.find((e) => e.reference === row.offence_reference)?.reference ?? row.offence_reference
+      : null;
+    return (
+      <StageSummaryCard title="Complaint">
+        {!geoLocked && (
+          <>
+            <SummaryField label="Zone" value={zoneLabel(row)} />
+            <SummaryField label="State" value={stateLabel(row)} />
+          </>
+        )}
+        <SummaryField label="Complaint Type" value={row.complaint_type} />
+        <SummaryField label="Date Received" value={row.date_received ?? row.complaint_date} />
+        <SummaryField label="Transmission Route" value={row.transmission_route} />
+        <SummaryField label="Domain" value={row.complaint_domain} />
+        <SummaryField label="Category" value={row.complaint_category ?? row.category} />
+        <SummaryField label="Priority" value={row.priority_rating} />
+        {offenceRef ? <SummaryField label="Offence Reference" value={offenceRef} /> : null}
+        <SummaryField label="Offence" value={row.description} fullWidth />
+        <SummaryField label="Complainant Category" value={row.complainant_category} />
+        <SummaryField label="Respondent Category" value={row.respondent_category} />
+      </StageSummaryCard>
+    );
+  };
+
+  const renderInvestigationSummary = (row?: any) => {
+    if (!row?.officer_assigned && !row?.investigation_start_date && !row?.actions_taken) return null;
+    return (
+      <StageSummaryCard title="Investigation">
+        <SummaryField label="Officer Assigned" value={row.officer_assigned ?? row.assigned_officer} />
+        <SummaryField label="Investigation Start Date" value={row.investigation_start_date} />
+        <SummaryField label="Status" value={row.status} />
+        <SummaryField label="Actions Taken" value={row.actions_taken} />
+        <SummaryField label="Actions Details" value={row.actions_details} fullWidth />
+      </StageSummaryCard>
+    );
+  };
+
+  const renderEscalationSummary = (row?: any) => {
+    if (!row?.escalated && !row?.escalation_level && !row?.escalation_date && !row?.escalated_to) return null;
+    return (
+      <StageSummaryCard title="Escalation">
+        <SummaryField label="Escalated" value={row.escalated ? "Yes" : "No"} />
+        <SummaryField label="Escalation Level" value={row.escalation_level} />
+        <SummaryField label="Escalation Date" value={row.escalation_date} />
+        <SummaryField label="Escalated To" value={row.escalated_to} />
+      </StageSummaryCard>
+    );
+  };
+
+  const renderPriorStageSummaries = (active: LifecycleStage, row?: any) => {
+    const prior = priorLifecycleStages(active);
+    if (!prior.length || !row) return null;
+    return (
+      <div className="space-y-3">
+        {prior.includes("registration") && renderRegistrationSummary(row)}
+        {prior.includes("investigation") && renderInvestigationSummary(row)}
+        {prior.includes("escalation") && renderEscalationSummary(row)}
+      </div>
+    );
+  };
+
+  const renderActiveStageForm = (row?: any, readOnly = false) => {
+    if (activeStage === "registration") return renderRegistrationSummary(row);
+    if (activeStage === "investigation") return renderInvestigationSection(readOnly, row);
+    if (activeStage === "escalation") return renderEscalationSection(readOnly, row);
+    return renderResolutionSection(readOnly, row);
   };
 
   const renderPartiesSection = (readOnly: boolean, row?: any) => (
@@ -716,39 +914,15 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     );
   };
 
-  const renderSlaReference = (activePriority?: string) => (
-    <Card className="rounded-2xl border-slate-200 bg-slate-50/50">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-bold text-slate-600">SLA Reference</CardTitle>
-      </CardHeader>
-      <CardContent className="pb-4">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-[10px]">Priority</TableHead>
-                <TableHead className="text-[10px]">Acknowledge</TableHead>
-                <TableHead className="text-[10px]">Investigate</TableHead>
-                <TableHead className="text-[10px]">Escalate</TableHead>
-                <TableHead className="text-[10px]">Resolve</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SLA_SUMMARY.map((s) => (
-                <TableRow key={s.priority} className={s.priority === activePriority ? "bg-[#e8f5ee]" : undefined}>
-                  <TableCell className="text-xs font-semibold">{s.priority}</TableCell>
-                  <TableCell className="text-xs">{s.acknowledge}</TableCell>
-                  <TableCell className="text-xs">{s.investigate}</TableCell>
-                  <TableCell className="text-xs">{s.escalate}</TableCell>
-                  <TableCell className="text-xs">{s.resolve}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const renderStageContent = (row?: any) => {
+    const closed = isComplaintClosed(row?.status);
+    return (
+      <div className="space-y-4">
+        {renderPriorStageSummaries(activeStage, row)}
+        {renderActiveStageForm(row, closed || activeStage === "registration")}
+      </div>
+    );
+  };
 
   const renderLifecycleStepper = (row: any) => {
     const completion = getStageCompletion(row);
@@ -776,87 +950,49 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
                   </div>
                   <div className="min-w-0">
                     <p className={`text-xs font-bold ${isActive ? "text-[#145c3f]" : "text-slate-700"}`}>{stage.label}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{stage.description}</p>
-                    {isCurrent && (
-                      <Badge variant="outline" className="mt-1.5 text-[9px]">Current stage</Badge>
-                    )}
                   </div>
                   {isActive && <ChevronRight className="w-4 h-4 text-[#25a872] ml-auto shrink-0" />}
                 </button>
               );
             })}
           </div>
-          <div className="px-4 py-3 border-t border-[#d4e8dc] bg-[#f8fbf9] flex flex-wrap items-center gap-3">
-            <span className="text-xs text-slate-500">Complaint ID:</span>
-            <span className="text-xs font-mono font-bold text-primary">{row?.complaint_number}</span>
-            <span className="text-xs text-slate-400">|</span>
-            <span className="text-xs text-slate-500">Status:</span>
-            {statusBadge(row?.status ?? "New/Acknowledged")}
+          <div className="px-4 py-3 border-t border-[#d4e8dc] bg-[#f8fbf9] flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-xs font-bold text-slate-700">{row?.complaint_number}</span>
+            <span className="text-xs text-slate-300">|</span>
+            {statusBadge(row?.status ?? "New/Acknowledged", true)}
             {row?.priority_rating && (
               <>
-                <span className="text-xs text-slate-400">|</span>
-                <Badge variant="outline" className="text-[10px]">{row.priority_rating} priority</Badge>
+                <span className="text-xs text-slate-300">|</span>
+                <Badge variant="outline" className="text-[10px] font-bold">{row.priority_rating} priority</Badge>
               </>
             )}
+            {row?.sla ? (
+              <>
+                <span className="text-xs text-slate-300">|</span>
+                <Badge variant="outline" className={`text-[10px] font-bold ${slaColorBadgeClass(row.sla.color)}`}>
+                  SLA: {slaColorLabel(row.sla.color)}
+                </Badge>
+                <span className="text-[11px] text-slate-500">
+                  {row.sla.working_days_elapsed} working day(s) since received
+                </span>
+                {(row.sla.flags ?? []).map((flag: { code: string; label: string }) => (
+                  <Badge key={flag.code} variant="outline" className="text-[10px] text-rose-700 border-rose-200 bg-rose-50">
+                    {flag.label}
+                  </Badge>
+                ))}
+              </>
+            ) : null}
           </div>
         </CardContent>
       </Card>
     );
   };
 
-  const renderStageContent = () => {
-    const row = selected;
-    if (activeStage === "registration") {
-      return (
-        <>
-          {renderComplaintSection(true, row)}
-          {renderPartiesSection(true, row)}
-          {renderSlaReference(row?.priority_rating)}
-        </>
-      );
-    }
-    if (activeStage === "investigation") {
-      return (
-        <>
-          <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-            <CardContent className="py-3 px-5 text-xs text-slate-600">
-              Record where the complaint is now and what actions have been taken during investigation.
-            </CardContent>
-          </Card>
-          {renderInvestigationSection(false, row)}
-        </>
-      );
-    }
-    if (activeStage === "escalation") {
-      return (
-        <>
-          <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-            <CardContent className="py-3 px-5 text-xs text-slate-600">
-              Record escalation details if the complaint needs to be moved to a higher authority.
-            </CardContent>
-          </Card>
-          {renderEscalationSection(false, row)}
-        </>
-      );
-    }
-    return (
-      <>
-        <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-          <CardContent className="py-3 px-5 text-xs text-slate-600">
-            Close the complaint and record the final outcome. Resolution days and SLA are calculated automatically.
-          </CardContent>
-        </Card>
-        {renderResolutionSection(false, row)}
-        {renderSlaReference(row?.priority_rating ?? f.priority_rating)}
-      </>
-    );
-  };
-
   const stageSaveLabel: Record<LifecycleStage, string> = {
-    registration: "Save Registration",
+    registration: "Save",
     investigation: "Save Investigation",
     escalation: "Save Escalation",
-    resolution: "Save Resolution",
+    resolution: "Close Complaint",
   };
 
   if (mode === "register") {
@@ -869,19 +1005,12 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Register Complaint</h2>
-              <p className="text-xs text-muted-foreground">Step 1 — Complaint &amp; parties (investigation follows after registration)</p>
             </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="w-full px-4 md:px-6 py-4 pb-24 space-y-4">
-            <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-              <CardContent className="py-3 px-5 flex items-center gap-3">
-                <Badge className="bg-[#25a872]">1</Badge>
-                <p className="text-xs text-slate-600">Register the complaint first. Investigation, escalation, and resolution are recorded separately after this.</p>
-              </CardContent>
-            </Card>
             {renderComplaintSection(false)}
             {renderPartiesSection(false)}
           </div>
@@ -891,7 +1020,7 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
           <Button variant="outline" onClick={closeSub}>Cancel</Button>
           <Button onClick={handleSaveRegistration} disabled={saving} className="bg-orange-action hover:bg-orange-600 gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Register &amp; Continue
+            Register Complaint
           </Button>
         </div>
       </div>
@@ -900,7 +1029,8 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
 
   if (mode === "manage") {
     const row = selected;
-    const canSaveStage = activeStage !== "registration";
+    const closed = isComplaintClosed(row?.status);
+    const canSaveStage = activeStage !== "registration" && !closed;
 
     return (
       <div className="flex flex-col h-full bg-slate-50/30">
@@ -911,7 +1041,6 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Complaint Management</h2>
-              <p className="text-xs text-muted-foreground">{row?.complaint_number} — lifecycle tracking</p>
             </div>
           </div>
         </div>
@@ -919,22 +1048,17 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
         <ScrollArea className="flex-1">
           <div className="w-full px-4 md:px-6 py-4 pb-24 space-y-4">
             {row && renderLifecycleStepper(row)}
-            {renderStageContent()}
+            {renderStageContent(row)}
           </div>
         </ScrollArea>
 
         {canSaveStage && (
-          <div className="sticky bottom-0 z-30 bg-white border-t px-4 md:px-6 py-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-500 hidden sm:block">
-              Saving updates only the <strong>{lifecycleStageLabel(activeStage)}</strong> stage
-            </p>
-            <div className="flex items-center gap-3 ml-auto">
-              <Button variant="outline" onClick={closeSub}>Back to List</Button>
-              <Button onClick={() => handleSaveStage(activeStage)} disabled={saving} className="bg-orange-action hover:bg-orange-600 gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {stageSaveLabel[activeStage]}
-              </Button>
-            </div>
+          <div className="sticky bottom-0 z-30 bg-white border-t px-4 md:px-6 py-3 flex items-center justify-end gap-3">
+            <Button variant="outline" onClick={closeSub}>Back to List</Button>
+            <Button onClick={() => handleSaveStage(activeStage)} disabled={saving} className="bg-orange-action hover:bg-orange-600 gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {stageSaveLabel[activeStage]}
+            </Button>
           </div>
         )}
       </div>
@@ -1103,15 +1227,14 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-[#f0fdf7] hover:bg-[#f0fdf7]">
-                        <TableHead className="text-xs font-bold">Complaint ID</TableHead>
-                        <TableHead className="text-xs font-bold">Type</TableHead>
-                        <TableHead className="text-xs font-bold">Category / Domain</TableHead>
-                        <TableHead className="text-xs font-bold">Priority</TableHead>
-                        <TableHead className="text-xs font-bold">Received</TableHead>
-                        <TableHead className="text-xs font-bold">Stage</TableHead>
-                        <TableHead className="text-xs font-bold">Status</TableHead>
-                        <TableHead className="text-xs font-bold">SLA</TableHead>
-                        <TableHead className="text-xs font-bold w-28"></TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Date</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Complaint ID</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Offence</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Priority</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Overdue</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Stage</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800">Status</TableHead>
+                        <TableHead className="text-xs font-black text-slate-800 text-right w-28">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1121,41 +1244,28 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: Math.min(i * 0.02, 0.3) }}
-                          className="border-b border-slate-100 hover:bg-[#f8fbf9]/80 transition-colors"
+                          className="border-b border-slate-100 transition-colors hover:bg-slate-50/80"
                         >
+                          <TableCell className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+                            {c.date_received || c.complaint_date || "—"}
+                          </TableCell>
                           <TableCell className="font-mono text-xs font-bold text-primary whitespace-nowrap">
                             {c.complaint_number}
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px] font-semibold">{c.complaint_type || "—"}</Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[200px]">
-                            <p className="text-xs font-medium text-slate-800 truncate">{c.complaint_category || c.category || "—"}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{c.complaint_domain || "—"}</p>
+                          <TableCell className="max-w-[260px]">
+                            <p className="text-xs font-medium text-slate-800 line-clamp-2">
+                              {c.description || c.complaint_category || c.category || "—"}
+                            </p>
                           </TableCell>
                           <TableCell>{priorityBadge(c.priority_rating)}</TableCell>
-                          <TableCell className="text-xs text-slate-500 whitespace-nowrap">
-                            {c.date_received || c.complaint_date || "—"}
-                          </TableCell>
-                          <TableCell>{stageBadge(c)}</TableCell>
-                          <TableCell>{statusBadge(c.status)}</TableCell>
-                          <TableCell>
-                            {c.resolution_within_sla == null ? (
-                              <span className="text-xs text-slate-300">—</span>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] font-semibold ${c.resolution_within_sla ? "text-emerald-700 border-emerald-200 bg-emerald-50" : "text-rose-700 border-rose-200 bg-rose-50"}`}
-                              >
-                                {c.resolution_within_sla ? "Met" : "Missed"}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
+                          <TableCell>{renderOverdueCell(c)}</TableCell>
+                          <TableCell className="font-bold">{stageBadge(c, true)}</TableCell>
+                          <TableCell className="font-bold">{statusBadge(c.status, true)}</TableCell>
+                          <TableCell className="text-right">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 text-xs gap-1.5 border-[#d4e8dc] hover:bg-[#e8f5ee] hover:text-[#145c3f]"
+                              className="h-8 text-xs font-semibold gap-1.5 border-[#d4e8dc] hover:bg-[#e8f5ee] hover:text-[#145c3f]"
                               onClick={() => openManage(c)}
                             >
                               Manage
