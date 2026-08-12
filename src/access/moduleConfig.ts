@@ -194,19 +194,10 @@ export const MODULE_CONFIG: ParentModule[] = [
         { title: "Stock Verification Dashboard", view: "stock-verification-dashboard", path: "/sdo/stock-dashboard" },
         { title: "Physical Asset Verification", view: "store-verification-verify", path: "/store-management/verification/verify" },
         { title: "Verification of Supply",      view: "store-supply-verification", path: "/store-management/verification/supply" },
-        {
-          title: "Stock Management",
-          type: "group",
-          label: "Store Management",
-          children: [
-            // { title: "Register Asset",        view: "store-assets-register",   path: "/store-management/assets/register" },
-            // { title: "Asset Master Register", view: "store-assets-list",       path: "/store-management/assets/list" },
-            { title: "Inventory Register",     view: "store-inventory-catalog", path: "/store-management/inventory/items" },
-            { title: "Capitalisation & Issuance", view: "store-asset-transfers",   path: "/store-management/transfers/requests" },
-            // { title: "Board Disposal",        view: "store-asset-disposal",    path: "/store-management/disposal/records" },
-            // { title: "Maintenance & Servicing", view: "store-asset-maintenance", path: "/store-management/maintenance/repairs" },
-          ],
-        },
+        { type: "group", label: "Store Management", children: [
+          { title: "Inventory Register",          view: "store-inventory-catalog",   path: "/store-management/inventory/items" },
+            { title: "Capitalisation & Issuance",   view: "store-asset-transfers",     path: "/store-management/transfers/requests" },
+          ]},
       ]},
       { type: "group", label: "SOC/ZONES", children: [] },
       { type: "group", label: "SPECIAL PROJECT", children: [

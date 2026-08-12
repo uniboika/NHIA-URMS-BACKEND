@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usersApi, type AdminUser } from "@/lib/adminApi";
 import AdminModal from "./AdminModal";
-import { MODULE_CONFIG, flatLeaves, moduleConfigForAccess, resolveModuleTitle, isSubGroup, type ChildModule } from "@/src/access/moduleConfig";
+import { MODULE_CONFIG, flatLeaves, moduleConfigForAccess, resolveModuleTitle, isSubGroup, type ChildModule, type SubGroup } from "@/src/access/moduleConfig";
 import { normalizeFunctionalityTitle } from "@/src/access/accessUtils";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -66,42 +66,81 @@ function ModuleRow({ mod, granted, onToggleParent, onToggleChild }: {
           {!parentChecked && (
             <p className="text-[10px] text-amber-600 italic pb-1">Enable parent module first</p>
           )}
-          {mod.children.map((child, i) => {
-            if (isSubGroup(child)) {
-              const leaves = child.children.filter((n): n is ChildModule => !isSubGroup(n));
-              return (
-                <div key={i}>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1.5 pt-1.5 pb-0.5">{child.label}</p>
-                  {leaves.map((leaf, j) => (
-                    <label key={j}
-                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-                        granted.has(leaf.title) ? "bg-[#e8f5ee]" : "hover:bg-slate-50"
-                      } ${!parentChecked ? "opacity-40 pointer-events-none" : ""}`}>
-                      <input type="checkbox" checked={granted.has(leaf.title)} disabled={!parentChecked}
-                        onChange={() => onToggleChild(mod.title, leaf.title, allChildTitles)}
-                        className="w-3.5 h-3.5 accent-[#145c3f] shrink-0" />
-                      <span className={`text-xs ${granted.has(leaf.title) ? "text-[#145c3f] font-medium" : "text-slate-600"}`}>{leaf.title}</span>
-                    </label>
-                  ))}
-                </div>
-              );
-            }
-            const leaf = child as ChildModule;
-            return (
-              <label key={i}
-                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-                  granted.has(leaf.title) ? "bg-[#e8f5ee]" : "hover:bg-slate-50"
-                } ${!parentChecked ? "opacity-40 pointer-events-none" : ""}`}>
-                <input type="checkbox" checked={granted.has(leaf.title)} disabled={!parentChecked}
-                  onChange={() => onToggleChild(mod.title, leaf.title, allChildTitles)}
-                  className="w-3.5 h-3.5 accent-[#145c3f] shrink-0" />
-                <span className={`text-xs ${granted.has(leaf.title) ? "text-[#145c3f] font-medium" : "text-slate-600"}`}>{leaf.title}</span>
-              </label>
-            );
-          })}
+          {mod.children.map((child, i) => (
+            <PrivilegeNode
+              key={i}
+              node={child}
+              depth={0}
+              parentTitle={mod.title}
+              parentChecked={parentChecked}
+              granted={granted}
+              allChildTitles={allChildTitles}
+              onToggleChild={onToggleChild}
+            />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function PrivilegeNode({
+  node,
+  depth,
+  parentTitle,
+  parentChecked,
+  granted,
+  allChildTitles,
+  onToggleChild,
+}: {
+  node: ChildModule | SubGroup;
+  depth: number;
+  parentTitle: string;
+  parentChecked: boolean;
+  granted: Set<string>;
+  allChildTitles: string[];
+  onToggleChild: (parentTitle: string, childTitle: string, allChildTitles: string[]) => void;
+}) {
+  if (isSubGroup(node)) {
+    return (
+      <div className={depth > 0 ? "pl-2" : undefined}>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1.5 pt-1.5 pb-0.5">
+          {node.label}
+        </p>
+        {node.children.map((child, i) => (
+          <PrivilegeNode
+            key={i}
+            node={child}
+            depth={depth + 1}
+            parentTitle={parentTitle}
+            parentChecked={parentChecked}
+            granted={granted}
+            allChildTitles={allChildTitles}
+            onToggleChild={onToggleChild}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const leaf = node as ChildModule;
+  return (
+    <label
+      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
+        granted.has(leaf.title) ? "bg-[#e8f5ee]" : "hover:bg-slate-50"
+      } ${!parentChecked ? "opacity-40 pointer-events-none" : ""}`}
+    >
+      <input
+        type="checkbox"
+        checked={granted.has(leaf.title)}
+        disabled={!parentChecked}
+        onChange={() => onToggleChild(parentTitle, leaf.title, allChildTitles)}
+        className="w-3.5 h-3.5 accent-[#145c3f] shrink-0"
+      />
+      <span className={`text-xs ${granted.has(leaf.title) ? "text-[#145c3f] font-medium" : "text-slate-600"}`}>
+        {leaf.title}
+      </span>
+    </label>
   );
 }
 

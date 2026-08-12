@@ -472,17 +472,19 @@ function ModuleAccessRow({ mod, parentChecked, someChecked, granted, onTogglePar
   const parentRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => { if (parentRef.current) parentRef.current.indeterminate = someChecked; }, [someChecked]);
 
-  // Flatten children for rendering (include group labels)
+  // Flatten children for rendering (include nested group labels)
   const renderChildren: { title: string; groupLabel?: string }[] = [];
-  mod.children.forEach(c => {
-    if (isSubGroup(c)) {
-      c.children.forEach(node => {
-        if (!isSubGroup(node)) renderChildren.push({ title: (node as ChildModule).title, groupLabel: c.label });
-      });
-    } else {
-      renderChildren.push({ title: (c as ChildModule).title });
-    }
-  });
+  const walk = (nodes: (typeof mod.children)[number][], groupPath?: string) => {
+    nodes.forEach((c) => {
+      if (isSubGroup(c)) {
+        const next = groupPath ? `${groupPath} › ${c.label}` : c.label;
+        walk(c.children, next);
+      } else {
+        renderChildren.push({ title: (c as ChildModule).title, groupLabel: groupPath });
+      }
+    });
+  };
+  walk(mod.children);
 
   return (
     <div className={`rounded-xl border transition-all ${parentChecked ? "border-[#25a872]" : "border-[#d4e8dc]"}`}>
