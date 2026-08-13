@@ -108,6 +108,8 @@ export function getComplianceStepCompletion(data: {
   complaintsReceived?: string | number;
   complaintSummary?: string;
   complaintCategoriesCount?: number;
+  resolvedAtFacility?: string | number;
+  escalatedTo?: string;
   violationsCount?: number;
   enforcementsCount?: number;
   reviewedBy?: string;
@@ -117,10 +119,43 @@ export function getComplianceStepCompletion(data: {
     header: !!(data.registered || data.refId),
     findings: (data.findingsCount ?? 0) > 0,
     complaints: !!(Number(data.complaintsReceived) || data.complaintSummary?.trim()
-      || (data.complaintCategoriesCount ?? 0) > 0),
+      || (data.complaintCategoriesCount ?? 0) > 0
+      || Number(data.resolvedAtFacility) > 0
+      || (data.escalatedTo && data.escalatedTo !== "none")),
     violations: (data.violationsCount ?? 0) > 0,
     enforcement: (data.enforcementsCount ?? 0) > 0 || !!data.reviewedBy?.trim() || !!data.stateRemarks?.trim(),
   };
+}
+
+/** KPI stats and drill-downs only include submitted reports with all mandatory steps complete. */
+export function isComplianceReportComplete(report: any): boolean {
+  if (report.status !== "submitted" && report.status !== "approved") return false;
+
+  const completion = getComplianceStepCompletion({
+    refId: report.reference_id,
+    registered: true,
+    findingsCount: (report.findings ?? []).length,
+    complaintsReceived: report.complaints_received,
+    complaintSummary: report.complaint_summary,
+    complaintCategoriesCount: parseComplaintCategories(report.complaint_categories).length,
+    resolvedAtFacility: report.resolved_at_facility,
+    escalatedTo: report.escalated_to,
+    violationsCount: (report.violations ?? []).length,
+    enforcementsCount: (report.enforcement_actions ?? []).length,
+    reviewedBy: report.reviewed_by,
+    stateRemarks: report.state_office_remarks,
+  });
+
+  return (
+    completion.header
+    && completion.findings
+    && completion.complaints
+    && completion.enforcement
+  );
+}
+
+export function filterCompleteComplianceReports(reports: any[]): any[] {
+  return reports.filter(isComplianceReportComplete);
 }
 
 export function firstOpenComplianceStep(completion: Record<ComplianceFormStep, boolean>): ComplianceFormStep {
@@ -146,4 +181,23 @@ export function parseComplaintCategories(raw: unknown): string[] {
     }
   }
   return [];
+}
+
+export type FindingStatusCounts = {
+  fully_compliant: number;
+  partially_compliant: number;
+  non_compliant: number;
+};
+
+export function countFindingStatuses(findings: { status?: string }[] | null | undefined): FindingStatusCounts {
+  const counts: FindingStatusCounts = {
+    fully_compliant: 0,
+    partially_compliant: 0,
+    non_compliant: 0,
+  };
+  for (const f of findings ?? []) {
+    const key = f.status as keyof FindingStatusCounts;
+    if (key in counts) counts[key] += 1;
+  }
+  return counts;
 }

@@ -1,7 +1,8 @@
 import * as React from "react";
 import {
   ArrowLeft, Plus, Loader2, RefreshCw, Eye,
-  FileText, CheckCircle2, Clock, Trash2, XCircle, Pencil,
+  FileText, CheckCircle2, Clock, XCircle, Pencil,
+  AlertTriangle, ShieldAlert, MinusCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -23,12 +24,21 @@ import {
   COMPLIANCE_RATINGS, CONFIRMATION_OPTIONS,
   currentISOWeek, quarterFromWeek, ratingLabel,
 } from "./complianceConstants";
-import { labelOf, formatCount } from "../stateOffice/constants";
+import { labelOf } from "../stateOffice/constants";
 import ComplianceReportForm, { FORM_STEPS, type FormStep } from "./ComplianceReportForm";
 import {
   firstOpenComplianceStep, getComplianceStepCompletion, complianceStepLabel,
-  nextComplianceStep, parseComplaintCategories,
+  nextComplianceStep, parseComplaintCategories, countFindingStatuses,
 } from "./complianceConstants";
+import DashboardDrillPanel, { type DrillContext, type DrillRow } from "@/components/dashboard/DashboardDrillPanel";
+import { ClickableKpi, getUnitHeadScope } from "@/components/dashboard/dashboardUi";
+import type { DrillStatChip } from "@/components/dashboard/drillStats";
+import {
+  buildComplianceDrillRows, computeComplianceKpis, parseReportIdFromDrillRow,
+  COMPLIANCE_DRILL_TITLES, type ComplianceDrillKind,
+} from "./complianceDrill";
+
+const MODULE_NAME = "Facility Compliance Report";
 
 const uid = () => Math.random().toString(36).slice(2);
 
@@ -179,12 +189,78 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
 
   React.useEffect(() => { if (mode === "list") load(); }, [mode, load]);
 
-  const counts = React.useMemo(() => ({
-    total: reports.length,
-    draft: reports.filter(r => r.status === "draft").length,
-    submitted: reports.filter(r => r.status === "submitted").length,
-    approved: reports.filter(r => r.status === "approved").length,
-  }), [reports]);
+  const kpiStats = React.useMemo(() => computeComplianceKpis(reports), [reports]);
+
+  const unitScope = React.useMemo(
+    () => getUnitHeadScope(MODULE_NAME, defaultStateId, defaultZoneId),
+    [defaultStateId, defaultZoneId],
+  );
+
+  const [drillOpen, setDrillOpen] = React.useState(false);
+  const [drillContext, setDrillContext] = React.useState<DrillContext | null>(null);
+  const [drillRows, setDrillRows] = React.useState<DrillRow[]>([]);
+  const [drillStackDepth, setDrillStackDepth] = React.useState(0);
+  const drillStackRef = React.useRef<{ context: DrillContext; rows: DrillRow[] }[]>([]);
+
+  const closeDrill = React.useCallback(() => {
+    setDrillOpen(false);
+    setDrillContext(null);
+    setDrillRows([]);
+    drillStackRef.current = [];
+    setDrillStackDepth(0);
+  }, []);
+
+  const openComplianceDrill = React.useCallback((kind: ComplianceDrillKind) => {
+    const rows = buildComplianceDrillRows(reports, kind);
+    const ctx: DrillContext = {
+      title: COMPLIANCE_DRILL_TITLES[kind],
+      subtitle: unitScope.drillSubtitle,
+      breadcrumbs: [MODULE_NAME],
+    };
+    drillStackRef.current = [];
+    setDrillStackDepth(0);
+    setDrillRows(rows);
+    setDrillContext(ctx);
+    setDrillOpen(true);
+  }, [reports, unitScope.drillSubtitle]);
+
+  const drillBack = React.useCallback(() => {
+    const prev = drillStackRef.current.pop();
+    setDrillStackDepth(drillStackRef.current.length);
+    if (!prev) {
+      closeDrill();
+      return;
+    }
+    setDrillContext(prev.context);
+    setDrillRows(prev.rows);
+  }, [closeDrill]);
+
+  const handleDrillStatClick = React.useCallback((stat: DrillStatChip) => {
+    if (stat.row) return;
+    let filtered = drillRows;
+    if (stat.filter?.status) {
+      filtered = filtered.filter(r =>
+        (r.status || "").toLowerCase() === stat.filter!.status!.toLowerCase(),
+      );
+    }
+    if (stat.filter?.zone_id) {
+      filtered = filtered.filter(r => String(r.zone_id) === stat.filter!.zone_id);
+    }
+    if (stat.filter?.state_id) {
+      filtered = filtered.filter(r => String(r.state_id) === stat.filter!.state_id);
+    }
+    if (!stat.filter || filtered.length === drillRows.length) return;
+    if (drillContext) {
+      drillStackRef.current = [...drillStackRef.current, { context: drillContext, rows: drillRows }];
+      setDrillStackDepth(drillStackRef.current.length);
+    }
+    setDrillRows(filtered);
+    setDrillContext({
+      title: `${drillContext?.title ?? COMPLIANCE_DRILL_TITLES.total} — ${stat.label}`,
+      subtitle: drillContext?.subtitle,
+      breadcrumbs: [...(drillContext?.breadcrumbs ?? [MODULE_NAME]), stat.label],
+    });
+  }, [drillRows, drillContext]);
 
   const yearOptions = React.useMemo(
     () => buildReportingYearOptions(reports.map(r => r.reporting_year)),
@@ -200,8 +276,6 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
     if (!zoneLocked) setFilterZone("all");
     if (showStateFilter) setFilterState(ALL_STATES);
   };
-
-  const showLocationCols = !defaultStateId || !defaultZoneId;
 
   const resetForm = () => {
     setSelectedId(null); setRefId(null); setViewReport(null);
@@ -257,6 +331,8 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
       complaintsReceived: v.complaints_received,
       complaintSummary: v.complaint_summary,
       complaintCategoriesCount: parseComplaintCategories(v.complaint_categories).length,
+      resolvedAtFacility: v.resolved_at_facility,
+      escalatedTo: v.escalated_to,
       violationsCount: (v.violations ?? []).length,
       enforcementsCount: (v.enforcement_actions ?? []).length,
       reviewedBy: v.reviewed_by,
@@ -265,26 +341,37 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
     setFormStep(firstOpenComplianceStep(completion));
   };
 
-  const buildPayload = (status: "draft" | "submitted") => ({
-    zone_id: Number(zoneId), state_id: Number(stateId),
-    reporting_year: Number(reportYear), reporting_week: Number(reportWeek),
-    officer_name: officerName, officer_staff_id: officerStaffId,
-    date_submitted: submitDate || null, reviewed_by: reviewedBy || null,
-    compliance_status_confirmed: statusConfirmed,
-    follow_up_required: followUp, certification: certification || null,
-    facility_name: facilityName, facility_code: facilityCode,
-    facility_type: facilityType, ownership, facility_address: facilityAddress,
-    complaints_received: Number(complaintsReceived) || 0,
-    complaint_categories: complaintCategories,
-    resolved_at_facility: Number(resolvedAtFacility) || 0,
-    escalated_to: escalatedTo, complaint_summary: complaintSummary || null,
-    state_office_remarks: stateRemarks || null,
-    submitted_by: authUser?.name ?? officerName,
-    status,
-    findings: findings.map(({ _key, ...f }) => f),
-    violations: violations.map(({ _key, ...v }) => ({ ...v, occurrences: Number(v.occurrences) || 0 })),
-    enforcement_actions: enforcements.map(({ _key, ...e }) => e),
-  });
+  React.useEffect(() => {
+    if (authUser?.name) setOfficerName(authUser.name);
+    if (authUser?.staff_id) setOfficerStaffId(authUser.staff_id);
+  }, [authUser]);
+
+  const buildPayload = (status: "draft" | "submitted") => {
+    const submitD = submitDate ? new Date(submitDate) : new Date();
+    const derivedYear = submitD.getFullYear();
+    const derivedWeek = currentISOWeek(submitD);
+    return {
+      zone_id: Number(zoneId), state_id: Number(stateId),
+      reporting_year: derivedYear, reporting_week: derivedWeek,
+      officer_name: authUser?.name ?? officerName,
+      officer_staff_id: authUser?.staff_id ?? officerStaffId,
+      date_submitted: submitDate || null, reviewed_by: reviewedBy || null,
+      compliance_status_confirmed: statusConfirmed,
+      follow_up_required: followUp, certification: certification || null,
+      facility_name: facilityName, facility_code: facilityCode,
+      facility_type: facilityType, ownership, facility_address: facilityAddress,
+      complaints_received: Number(complaintsReceived) || 0,
+      complaint_categories: complaintCategories,
+      resolved_at_facility: Number(resolvedAtFacility) || 0,
+      escalated_to: escalatedTo, complaint_summary: complaintSummary || null,
+      state_office_remarks: stateRemarks || null,
+      submitted_by: authUser?.name ?? officerName,
+      status,
+      findings: findings.map(({ _key, ...f }) => f),
+      violations: violations.map(({ _key, ...v }) => ({ ...v, occurrences: Number(v.occurrences) || 0 })),
+      enforcement_actions: enforcements.map(({ _key, ...e }) => e),
+    };
+  };
 
   const clearFacility = () => {
     setFacilityProviderId("");
@@ -325,16 +412,36 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
     if (step === "header") {
       if (!zoneId) return "Select zone";
       if (!stateId) return "Select state";
-      if (!reportYear) return "Select reporting year";
-      if (!officerName.trim()) return "Compliance officer name is required";
-      if (!officerStaffId.trim()) return "Staff ID is required";
+      if (!submitDate) return "Date submitted is required";
       if (!facilityProviderId && !facilityName.trim()) return "Select a facility";
-      if (!facilityCode.trim()) return "Facility code is required — select a facility from the list";
-      if (!facilityType) return "Select facility type";
       if (!ownership) return "Select ownership";
     }
     if (step === "findings" && findings.length === 0) {
       return "Add at least one compliance finding";
+    }
+    if (step === "complaints") {
+      const complaintsDone = getComplianceStepCompletion({
+        registered: true,
+        findingsCount: findings.length,
+        complaintsReceived,
+        complaintSummary,
+        complaintCategoriesCount: complaintCategories.length,
+        resolvedAtFacility,
+        escalatedTo,
+      }).complaints;
+      if (!complaintsDone) {
+        return "Complete the complaint summary (record complaints received, categories, or a summary note)";
+      }
+    }
+    if (step === "enforcement") {
+      const enforcementDone = getComplianceStepCompletion({
+        enforcementsCount: enforcements.length,
+        reviewedBy,
+        stateRemarks,
+      }).enforcement;
+      if (!enforcementDone) {
+        return "Complete the enforcement review (add an action, reviewer, or state office remarks)";
+      }
     }
     return null;
   };
@@ -422,6 +529,14 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
       setMode("view");
     } catch (e: any) { toast.error(e.message); }
   };
+
+  const handleDrillRowClick = React.useCallback((row: DrillRow) => {
+    const reportId = parseReportIdFromDrillRow(row);
+    if (reportId) {
+      closeDrill();
+      void openView(reportId);
+    }
+  }, [closeDrill]);
 
   const toggleCategory = (cat: string) => {
     setComplaintCategories(prev =>
@@ -516,7 +631,25 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
           </Card>
 
           <Card className="rounded-2xl border-[#d4e8dc]">
-            <CardHeader><CardTitle className="text-base">2. Compliance Findings</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">2. Compliance Findings</CardTitle>
+              {(() => {
+                const fc = v.finding_counts ?? countFindingStatuses(findingsList);
+                const labels = [
+                  fc.fully_compliant > 0 && { text: "Fully Compliant", cls: "text-emerald-700" },
+                  fc.partially_compliant > 0 && { text: "Partially Compliant", cls: "text-amber-700" },
+                  fc.non_compliant > 0 && { text: "Non-Compliant", cls: "text-red-700" },
+                ].filter(Boolean) as { text: string; cls: string }[];
+                if (!labels.length) return null;
+                return (
+                  <CardDescription className="flex flex-wrap gap-3 pt-1">
+                    {labels.map(item => (
+                      <span key={item.text} className={`${item.cls} font-medium`}>{item.text}</span>
+                    ))}
+                  </CardDescription>
+                );
+              })()}
+            </CardHeader>
             <CardContent>
               {findingsList.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">No findings recorded.</p>
@@ -780,19 +913,45 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
             <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: "Total", value: counts.total, color: "bg-slate-50 border-slate-200", text: "text-slate-700" },
-                  { label: "Draft", value: counts.draft, color: "bg-slate-50 border-slate-200", text: "text-slate-600" },
-                  { label: "Submitted", value: counts.submitted, color: "bg-blue-50 border-blue-200", text: "text-blue-700" },
-                  { label: "Approved", value: counts.approved, color: "bg-emerald-50 border-emerald-200", text: "text-emerald-700" },
-                ].map(c => (
-                  <motion.div key={c.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-2xl p-5 border ${c.color}`}>
-                    <p className={`text-3xl font-black ${c.text}`}>{formatCount(c.value)}</p>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">{c.label}</p>
-                  </motion.div>
-                ))}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-stretch">
+                <ClickableKpi
+                  label="Total Reports"
+                  value={kpiStats.total}
+                  icon={<FileText className="w-5 h-5 text-slate-600" />}
+                  onClick={() => openComplianceDrill("total")}
+                />
+                <ClickableKpi
+                  label="Fully Compliant"
+                  value={kpiStats.fully}
+                  icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                  onClick={() => openComplianceDrill("fully")}
+                />
+                <ClickableKpi
+                  label="Partially Compliant"
+                  value={kpiStats.partially}
+                  icon={<MinusCircle className="w-5 h-5 text-amber-600" />}
+                  onClick={() => openComplianceDrill("partially")}
+                />
+                <ClickableKpi
+                  label="Non-Compliant"
+                  value={kpiStats.non}
+                  icon={<XCircle className="w-5 h-5 text-red-600" />}
+                  onClick={() => openComplianceDrill("non")}
+                />
+                <ClickableKpi
+                  label="Violations"
+                  value={kpiStats.violations}
+                  icon={<AlertTriangle className="w-5 h-5 text-orange-600" />}
+                  onClick={() => openComplianceDrill("violations")}
+                  detail="Reports with violations"
+                />
+                <ClickableKpi
+                  label="Enforcement"
+                  value={kpiStats.enforcement}
+                  icon={<ShieldAlert className="w-5 h-5 text-violet-600" />}
+                  onClick={() => openComplianceDrill("enforcement")}
+                  detail="Reports with enforcement"
+                />
               </div>
 
               <Card className="rounded-2xl border-[#d4e8dc] shadow-sm overflow-hidden">
@@ -822,19 +981,12 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-[#f0fdf7] hover:bg-[#f0fdf7]">
-                            <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Report ID</TableHead>
+                            <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Date</TableHead>
                             <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Facility</TableHead>
-                            {showLocationCols && (
-                              <>
-                                <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Zone</TableHead>
-                                <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">State</TableHead>
-                              </>
-                            )}
                             <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Period</TableHead>
-                            <TableHead className="text-xs font-bold text-slate-600 text-right whitespace-nowrap">Findings</TableHead>
                             <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Officer</TableHead>
                             <TableHead className="text-xs font-bold text-slate-600 whitespace-nowrap">Status</TableHead>
-                            <TableHead className="text-right text-xs font-bold text-slate-600 whitespace-nowrap">View</TableHead>
+                            <TableHead className="text-right text-xs font-bold text-slate-600 whitespace-nowrap">Action</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -844,20 +996,13 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
                               <motion.tr key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.02 }}
                                 className="hover:bg-[#f8fdfb] transition-colors border-b border-slate-100 last:border-0">
-                                <TableCell>
-                                  <span className="font-mono text-xs font-bold text-primary">{r.reference_id}</span>
+                                <TableCell className="text-sm text-slate-600 whitespace-nowrap">
+                                  {r.date_submitted?.slice(0, 10) ?? "—"}
                                 </TableCell>
                                 <TableCell className="text-sm font-semibold text-slate-800 whitespace-nowrap">{r.facility_name || "—"}</TableCell>
-                                {showLocationCols && (
-                                  <>
-                                    <TableCell className="text-sm text-slate-600 whitespace-nowrap">{r.zone?.description ?? "—"}</TableCell>
-                                    <TableCell className="text-sm font-semibold text-slate-800 whitespace-nowrap">{r.state?.description ?? "—"}</TableCell>
-                                  </>
-                                )}
                                 <TableCell className="text-sm text-slate-600 whitespace-nowrap">
                                   Q{r.reporting_quarter ?? quarterFromWeek(Number(r.reporting_week))} · {r.reporting_year}
                                 </TableCell>
-                                <TableCell className="text-sm text-slate-500 text-right tabular-nums">{r.findings?.length ?? 0}</TableCell>
                                 <TableCell className="text-sm text-slate-500 whitespace-nowrap">{r.officer_name || "—"}</TableCell>
                                 <TableCell>
                                   <Badge className={`text-[10px] px-2 py-0.5 flex items-center gap-1 w-fit border ${st.cls}`}>
@@ -884,6 +1029,16 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
           )}
         </div>
       </ScrollArea>
+
+      <DashboardDrillPanel
+        open={drillOpen}
+        context={drillContext}
+        rows={drillRows}
+        onClose={closeDrill}
+        onBack={drillStackDepth > 0 ? drillBack : undefined}
+        onRowClick={handleDrillRowClick}
+        onStatClick={handleDrillStatClick}
+      />
     </div>
   );
 }

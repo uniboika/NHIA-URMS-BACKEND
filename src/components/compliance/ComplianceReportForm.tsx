@@ -11,10 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { buildReportingYearOptions } from "../monthly/reportingYears";
 import AccreditedProviderSelect from "../stateOffice/AccreditedProviderSelect";
 import {
-  OWNERSHIP_OPTIONS, FACILITY_TYPE_OPTIONS, COMPLAINT_CATEGORIES,
+  OWNERSHIP_OPTIONS, COMPLAINT_CATEGORIES,
   ESCALATION_OPTIONS, ENFORCEMENT_ACTIONS, COMPLIANCE_SECTIONS,
   COMPLIANCE_RATINGS, CONFIRMATION_OPTIONS,
   quarterFromWeek, ratingLabel,
@@ -36,13 +35,6 @@ export type Finding = { _key: string; section: string; indicator: string; status
 export type Violation = { _key: string; nature_of_violation: string; nhia_act_section: string; occurrences: string; action_taken: string };
 export type Enforcement = { _key: string; enforcement_action: string; details: string };
 
-const STAGE_HINTS: Partial<Record<FormStep, string>> = {
-  findings: "Record each compliance observation as a separate finding. At least one finding is required before final submission.",
-  complaints: "Summarize complaints received at this facility during the reporting period.",
-  violations: "Record any NHIA Act or guideline violations observed (optional).",
-  enforcement: "Record enforcement actions taken and complete the final review before submitting the report.",
-};
-
 const STAGE_SAVE_LABEL: Record<FormStep, string> = {
   header: "",
   findings: "Save & Continue",
@@ -50,6 +42,15 @@ const STAGE_SAVE_LABEL: Record<FormStep, string> = {
   violations: "Save & Continue",
   enforcement: "Save Enforcement",
 };
+
+function ReadOnlyText({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">{label}</p>
+      <p className="text-sm font-semibold text-slate-900">{value || "—"}</p>
+    </div>
+  );
+}
 
 export interface ComplianceReportFormProps {
   refId: string | null;
@@ -157,6 +158,8 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
     complaintsReceived,
     complaintSummary,
     complaintCategoriesCount: complaintCategories.length,
+    resolvedAtFacility,
+    escalatedTo,
     violationsCount: violations.length,
     enforcementsCount: enforcements.length,
     reviewedBy,
@@ -185,10 +188,6 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
                 </div>
                 <div className="min-w-0">
                   <p className={`text-xs font-bold ${isActive ? "text-[#145c3f]" : "text-slate-700"}`}>{stage.label}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{stage.description}</p>
-                  {isCurrent && (
-                    <Badge variant="outline" className="mt-1.5 text-[9px]">Current stage</Badge>
-                  )}
                 </div>
                 {isActive && <ChevronRight className="w-4 h-4 text-[#25a872] ml-auto shrink-0" />}
               </button>
@@ -208,68 +207,67 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
     </Card>
   );
 
-  const renderHeaderSection = (readOnly: boolean) => (
-    <Card className="rounded-2xl border-[#d4e8dc] w-full">
-      <CardHeader>
-        <CardTitle className="text-base">Report Header</CardTitle>
-        <CardDescription>Q{quarterFromWeek(Number(reportWeek))} · {reportYear}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">Zone</Label> : <ReqLabel>Zone</ReqLabel>}
-          {readOnly ? (
-            <Input className={readOnlyCls} value={zoneDisplay} readOnly />
-          ) : (
-            <Select value={zoneId} onValueChange={onZoneChange} disabled={lockZone}>
-              <SelectTrigger className={inputCls} displayValue={zoneDisplay}>
-                <SelectValue placeholder="Select zone" />
-              </SelectTrigger>
-              <SelectContent>{zones.map(z => <SelectItem key={z.id} value={String(z.id)}>{z.label}</SelectItem>)}</SelectContent>
-            </Select>
+  const renderHeaderSection = (readOnly: boolean) => {
+    const geoLocked = lockZone && lockState;
+    const showGeoFields = readOnly || !geoLocked;
+    return (
+      <Card className="rounded-2xl border-[#d4e8dc] w-full">
+        <CardHeader>
+          <CardTitle className="text-base">Report Header</CardTitle>
+          {readOnly && (
+            <CardDescription>Q{quarterFromWeek(Number(reportWeek))} · {reportYear}</CardDescription>
           )}
-        </div>
-        <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">State</Label> : <ReqLabel>State</ReqLabel>}
-          {readOnly ? (
-            <Input className={readOnlyCls} value={stateDisplay} readOnly />
-          ) : (
-            <Select value={stateId} onValueChange={onStateChange} disabled={lockState || !zoneId}>
-              <SelectTrigger className={inputCls} displayValue={stateDisplay}>
-                <SelectValue placeholder="Select state" />
-              </SelectTrigger>
-              <SelectContent>{stateOpts.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.label}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">Reporting Year</Label> : <ReqLabel>Reporting Year</ReqLabel>}
-          {readOnly ? (
-            <Input className={readOnlyCls} value={reportYear} readOnly />
-          ) : (
-            <Select value={reportYear} onValueChange={setReportYear}>
-              <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
-              <SelectContent>{buildReportingYearOptions().map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">Compliance Officer</Label> : <ReqLabel>Compliance Officer</ReqLabel>}
-          <Input className={readOnly ? readOnlyCls : inputCls} value={officerName}
-            onChange={e => setOfficerName(e.target.value)} readOnly={readOnly} />
-        </div>
-        <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">Staff ID</Label> : <ReqLabel>Staff ID</ReqLabel>}
-          <Input className={readOnly ? readOnlyCls : inputCls} value={officerStaffId}
-            onChange={e => setOfficerStaffId(e.target.value)} readOnly={readOnly} />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Date Submitted</Label>
-          <Input className={readOnly ? readOnlyCls : inputCls} type="date" value={submitDate}
-            onChange={e => setSubmitDate(e.target.value)} readOnly={readOnly} />
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className={`grid grid-cols-1 gap-4 ${showGeoFields ? "md:grid-cols-2 lg:grid-cols-3" : ""}`}>
+            {showGeoFields && (
+              <>
+                <div className="space-y-1.5">
+                  {readOnly ? <Label className="text-xs">Zone</Label> : <ReqLabel>Zone</ReqLabel>}
+                  {readOnly ? (
+                    <Input className={readOnlyCls} value={zoneDisplay} readOnly />
+                  ) : (
+                    <Select value={zoneId} onValueChange={onZoneChange} disabled={lockZone}>
+                      <SelectTrigger className={inputCls} displayValue={zoneDisplay}>
+                        <SelectValue placeholder="Select zone" />
+                      </SelectTrigger>
+                      <SelectContent>{zones.map(z => <SelectItem key={z.id} value={String(z.id)}>{z.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {readOnly ? <Label className="text-xs">State</Label> : <ReqLabel>State</ReqLabel>}
+                  {readOnly ? (
+                    <Input className={readOnlyCls} value={stateDisplay} readOnly />
+                  ) : (
+                    <Select value={stateId} onValueChange={onStateChange} disabled={lockState || !zoneId}>
+                      <SelectTrigger className={inputCls} displayValue={stateDisplay}>
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>{stateOpts.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </>
+            )}
+            <div className="space-y-1.5">
+              {readOnly ? <Label className="text-xs">Date Submitted</Label> : <ReqLabel>Date Submitted</ReqLabel>}
+              {readOnly ? (
+                <Input className={readOnlyCls} value={submitDate} readOnly />
+              ) : (
+                <Input className={inputCls} type="date" value={submitDate}
+                  onChange={e => setSubmitDate(e.target.value)} />
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <ReadOnlyText label="Compliance Officer" value={officerName} />
+            <ReadOnlyText label="Staff ID" value={officerStaffId} />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderFacilitySection = (readOnly: boolean) => (
     <Card className="rounded-2xl border-[#d4e8dc] w-full">
@@ -299,19 +297,10 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
           )}
         </div>
         <div className="space-y-1.5">
-          <ReqLabel>Facility Code</ReqLabel>
-          <Input className={`${readOnlyCls} font-mono`} value={facilityCode} readOnly placeholder="NHIA provider code" />
+          <ReadOnlyText label="Facility Code" value={facilityCode || undefined} />
         </div>
         <div className="space-y-1.5">
-          {readOnly ? <Label className="text-xs">Facility Type</Label> : <ReqLabel>Facility Type</ReqLabel>}
-          {readOnly ? (
-            <Input className={readOnlyCls} value={facilityType} readOnly />
-          ) : (
-            <Select value={facilityType} onValueChange={setFacilityType}>
-              <SelectTrigger className={inputCls}><SelectValue placeholder="Select type" /></SelectTrigger>
-              <SelectContent>{FACILITY_TYPE_OPTIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
+          <ReadOnlyText label="Facility Type" value={facilityType || undefined} />
         </div>
         <div className="space-y-1.5">
           {readOnly ? <Label className="text-xs">Ownership</Label> : <ReqLabel>Ownership</ReqLabel>}
@@ -325,10 +314,7 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
           )}
         </div>
         <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
-          <Label className="text-xs">Facility Address</Label>
-          <Input className={readOnly ? readOnlyCls : inputCls} value={facilityAddress}
-            onChange={e => setFacilityAddress(e.target.value)} readOnly={readOnly}
-            placeholder="Address from NHIA list or enter manually" />
+          <ReadOnlyText label="Facility Address" value={facilityAddress || undefined} />
         </div>
       </CardContent>
     </Card>
@@ -338,7 +324,6 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
     <Card className="rounded-2xl border-[#d4e8dc] w-full">
       <CardHeader>
         <CardTitle className="text-base">Compliance Findings</CardTitle>
-        <CardDescription>Each finding is a separate observation — at least one required before submission</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-[#f4f7f5] border border-[#d4e8dc]">
@@ -554,22 +539,11 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
           </Button>
           <div className="min-w-0">
             <h2 className="text-xl font-bold tracking-tight">Facility Compliance Report</h2>
-            <p className="text-xs text-muted-foreground truncate">
-              Step 1 — Report &amp; facility (findings follow after registration)
-            </p>
           </div>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="w-full px-4 md:px-6 py-4 pb-24 space-y-4">
-            <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-              <CardContent className="py-3 px-5 flex items-center gap-3">
-                <Badge className="bg-[#25a872]">1</Badge>
-                <p className="text-xs text-slate-600">
-                  Register the report header and facility first. Findings, complaints, violations, and enforcement are recorded separately after this.
-                </p>
-              </CardContent>
-            </Card>
             {renderHeaderSection(false)}
             {renderFacilitySection(false)}
           </div>
@@ -586,9 +560,7 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
     );
   }
 
-  /* ── Lifecycle tracking — after step 1 is saved ── */
   const canSaveStage = formStep !== "header";
-  const stageHint = STAGE_HINTS[formStep];
 
   return (
     <div className="flex flex-col h-full bg-slate-50/30">
@@ -597,41 +569,30 @@ export default function ComplianceReportForm(props: ComplianceReportFormProps) {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="min-w-0">
-          <h2 className="text-xl font-bold tracking-tight">Compliance Management</h2>
-          <p className="text-xs text-muted-foreground truncate">{refId} — lifecycle tracking</p>
+          <h2 className="text-xl font-bold tracking-tight">Facility Compliance Report</h2>
         </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="w-full px-4 md:px-6 py-4 pb-24 space-y-4">
           {renderLifecycleStepper()}
-          {stageHint && formStep !== "header" && (
-            <Card className="rounded-2xl border-[#d4e8dc] bg-[#f8fbf9]/50">
-              <CardContent className="py-3 px-5 text-xs text-slate-600">{stageHint}</CardContent>
-            </Card>
-          )}
           {renderStageContent()}
         </div>
       </ScrollArea>
 
       {canSaveStage && (
-        <div className="sticky bottom-0 z-30 bg-white border-t px-4 md:px-6 py-3 flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-500 hidden sm:block">
-            Saving updates only the <strong>{complianceStepLabel(formStep)}</strong> stage
-          </p>
-          <div className="flex items-center gap-3 ml-auto">
-            <Button variant="outline" onClick={onCancel}>Back to List</Button>
-            <Button variant="outline" onClick={onSaveStage} disabled={saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {STAGE_SAVE_LABEL[formStep]}
+        <div className="sticky bottom-0 z-30 bg-white border-t px-4 md:px-6 py-3 flex items-center justify-end gap-3">
+          <Button variant="outline" onClick={onCancel}>Back to List</Button>
+          <Button variant="outline" onClick={onSaveStage} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {STAGE_SAVE_LABEL[formStep]}
+          </Button>
+          {formStep === "enforcement" && (
+            <Button className="bg-[#145c3f] hover:bg-[#0f3d2e] gap-2" onClick={onSubmit} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Submit Report
             </Button>
-            {formStep === "enforcement" && (
-              <Button className="bg-[#145c3f] hover:bg-[#0f3d2e] gap-2" onClick={onSubmit} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Submit Report
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       )}
     </div>

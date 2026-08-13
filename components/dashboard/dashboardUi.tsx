@@ -44,23 +44,25 @@ export function ClickableKpi({
 }) {
   const Tag = drillable && onClick ? "button" : "div";
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="h-full">
       <Tag
         type={Tag === "button" ? "button" : undefined}
         onClick={onClick}
-        className={`rounded-2xl p-4 border bg-white border-[#d4e8dc] text-left w-full ${
+        className={`rounded-2xl p-4 border bg-white border-[#d4e8dc] text-left w-full h-full flex flex-col ${
           drillable && onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group" : ""
         }`}
       >
-        <div className="mb-2">{icon}</div>
-        <p className="text-xl font-black text-slate-800">{value}</p>
-        <p className="text-[10px] font-semibold text-slate-500 mt-1 leading-tight">{label}</p>
+        <div className="mb-2 shrink-0">{icon}</div>
+        <p className="text-xl font-black text-slate-800 shrink-0">{value}</p>
+        <p className="text-[10px] font-semibold text-slate-500 mt-1 leading-tight shrink-0">{label}</p>
         {detail ? (
-          <p className="text-[10px] font-medium text-slate-500 mt-1 leading-tight">{detail}</p>
-        ) : null}
+          <p className="text-[10px] font-medium text-slate-500 mt-1 leading-tight shrink-0">{detail}</p>
+        ) : (
+          <span className="block min-h-[14px] shrink-0" aria-hidden />
+        )}
         {drillable && onClick && (
-          <p className="text-[9px] text-[#25a872] font-semibold mt-1.5 flex items-center gap-0.5">
-            {hint || "Click to drill down"} <ChevronRight className="w-3 h-3" />
+          <p className="text-[9px] text-[#25a872] font-semibold mt-auto pt-1.5 flex items-center gap-0.5 shrink-0">
+            {hint || "Click to show drilldown"} <ChevronRight className="w-3 h-3" />
           </p>
         )}
       </Tag>
