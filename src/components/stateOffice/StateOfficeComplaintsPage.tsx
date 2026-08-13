@@ -177,9 +177,6 @@ export default function StateOfficeComplaintsPage({ onBack, defaultStateId, defa
               <MessageSquare className="w-5 h-5" />
               {drilldownTitle}
             </h2>
-            <p className="text-xs text-muted-foreground">
-              {monthLabel(filterMonth)} {filterYear}
-            </p>
           </div>
         </div>
         <ScrollArea className="flex-1">
@@ -236,7 +233,6 @@ export default function StateOfficeComplaintsPage({ onBack, defaultStateId, defa
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Register Complaint</h2>
-              <p className="text-xs text-muted-foreground">F. Enrollee complaints — against HMO or HCP</p>
             </div>
           </div>
         </div>

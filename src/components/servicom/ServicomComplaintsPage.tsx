@@ -22,8 +22,8 @@ import {
   COMPLAINT_OUTCOMES, SLA_SUMMARY, domainCodeFromDomain, computeResolutionPreview,
   slaForPriority, STATUS_BADGE_CLASS, COMPLAINT_LIFECYCLE, INVESTIGATION_STATUSES,
   lifecycleStageFromStatus, getStageCompletion, lifecycleStageLabel,
-  nextLifecycleStage, priorLifecycleStages, isComplaintClosed,
-  slaColorBadgeClass, slaColorLabel,
+  nextLifecycleStage, isComplaintClosed,
+  slaColorDotClass, computeSlaOverdueDays, slaRowClass,
   type LifecycleStage, type ComplaintSlaRuleRow,
 } from "./complaintRegisterConstants";
 import { HCF_CLASSIFICATION_GUIDE } from "./hcfClassificationGuide";
@@ -357,21 +357,15 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
   const renderOverdueCell = (c: any) => {
     const sla = c.sla;
     if (!sla) return <span className="text-xs text-slate-400">—</span>;
-    const flags = sla.flags ?? [];
+    const overdueDays = computeSlaOverdueDays(sla);
     return (
-      <div className="space-y-1 min-w-[140px]">
-        <Badge variant="outline" className={`text-[10px] font-bold ${slaColorBadgeClass(sla.color)}`}>
-          {slaColorLabel(sla.color)}
-        </Badge>
-        {flags.length === 0 ? (
-          <p className="text-[10px] font-semibold text-emerald-700">None</p>
-        ) : (
-          flags.map((flag: { code: string; label: string }) => (
-            <p key={flag.code} className="text-[10px] font-bold text-rose-700 flex items-start gap-1 leading-snug">
-              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-              <span>{flag.label}</span>
-            </p>
-          ))
+      <div className="flex items-center gap-2">
+        <span
+          className={`h-3.5 w-3.5 shrink-0 rounded-full ${slaColorDotClass(sla.color)}`}
+          title={sla.message ?? undefined}
+        />
+        {overdueDays > 0 && (
+          <span className="text-xs font-bold text-slate-800 tabular-nums">{overdueDays}</span>
         )}
       </div>
     );
@@ -758,43 +752,6 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     );
   };
 
-  const renderInvestigationSummary = (row?: any) => {
-    if (!row?.officer_assigned && !row?.investigation_start_date && !row?.actions_taken) return null;
-    return (
-      <StageSummaryCard title="Investigation">
-        <SummaryField label="Officer Assigned" value={row.officer_assigned ?? row.assigned_officer} />
-        <SummaryField label="Investigation Start Date" value={row.investigation_start_date} />
-        <SummaryField label="Status" value={row.status} />
-        <SummaryField label="Actions Taken" value={row.actions_taken} />
-        <SummaryField label="Actions Details" value={row.actions_details} fullWidth />
-      </StageSummaryCard>
-    );
-  };
-
-  const renderEscalationSummary = (row?: any) => {
-    if (!row?.escalated && !row?.escalation_level && !row?.escalation_date && !row?.escalated_to) return null;
-    return (
-      <StageSummaryCard title="Escalation">
-        <SummaryField label="Escalated" value={row.escalated ? "Yes" : "No"} />
-        <SummaryField label="Escalation Level" value={row.escalation_level} />
-        <SummaryField label="Escalation Date" value={row.escalation_date} />
-        <SummaryField label="Escalated To" value={row.escalated_to} />
-      </StageSummaryCard>
-    );
-  };
-
-  const renderPriorStageSummaries = (active: LifecycleStage, row?: any) => {
-    const prior = priorLifecycleStages(active);
-    if (!prior.length || !row) return null;
-    return (
-      <div className="space-y-3">
-        {prior.includes("registration") && renderRegistrationSummary(row)}
-        {prior.includes("investigation") && renderInvestigationSummary(row)}
-        {prior.includes("escalation") && renderEscalationSummary(row)}
-      </div>
-    );
-  };
-
   const renderActiveStageForm = (row?: any, readOnly = false) => {
     if (activeStage === "registration") return renderRegistrationSummary(row);
     if (activeStage === "investigation") return renderInvestigationSection(readOnly, row);
@@ -918,7 +875,6 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
     const closed = isComplaintClosed(row?.status);
     return (
       <div className="space-y-4">
-        {renderPriorStageSummaries(activeStage, row)}
         {renderActiveStageForm(row, closed || activeStage === "registration")}
       </div>
     );
@@ -969,9 +925,14 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
             {row?.sla ? (
               <>
                 <span className="text-xs text-slate-300">|</span>
-                <Badge variant="outline" className={`text-[10px] font-bold ${slaColorBadgeClass(row.sla.color)}`}>
-                  SLA: {slaColorLabel(row.sla.color)}
-                </Badge>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${slaColorDotClass(row.sla.color)}`} />
+                  {computeSlaOverdueDays(row.sla) > 0 && (
+                    <span className="text-[11px] font-bold text-slate-700 tabular-nums">
+                      {computeSlaOverdueDays(row.sla)}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[11px] text-slate-500">
                   {row.sla.working_days_elapsed} working day(s) since received
                 </span>
@@ -1074,7 +1035,6 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Complaints Management</h2>
-            <p className="text-xs text-muted-foreground">Register, investigate, escalate, and resolve complaints</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1228,7 +1188,6 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
                     <TableHeader>
                       <TableRow className="bg-[#f0fdf7] hover:bg-[#f0fdf7]">
                         <TableHead className="text-xs font-black text-slate-800">Date</TableHead>
-                        <TableHead className="text-xs font-black text-slate-800">Complaint ID</TableHead>
                         <TableHead className="text-xs font-black text-slate-800">Offence</TableHead>
                         <TableHead className="text-xs font-black text-slate-800">Priority</TableHead>
                         <TableHead className="text-xs font-black text-slate-800">Overdue</TableHead>
@@ -1244,13 +1203,10 @@ export default function ServicomComplaintsPage({ onBack, defaultStateId, default
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: Math.min(i * 0.02, 0.3) }}
-                          className="border-b border-slate-100 transition-colors hover:bg-slate-50/80"
+                          className={`border-b border-slate-100 transition-colors ${slaRowClass(c.sla?.color)}`}
                         >
                           <TableCell className="text-xs font-semibold text-slate-700 whitespace-nowrap">
                             {c.date_received || c.complaint_date || "—"}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs font-bold text-primary whitespace-nowrap">
-                            {c.complaint_number}
                           </TableCell>
                           <TableCell className="max-w-[260px]">
                             <p className="text-xs font-medium text-slate-800 line-clamp-2">

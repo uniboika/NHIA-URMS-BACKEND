@@ -147,10 +147,6 @@ export default function ReportEntry({ onBack, onPreview }: ReportEntryProps) {
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Unified Report Entry</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5 uppercase font-bold">Draft</Badge>
-              Last saved: 2 mins ago
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">

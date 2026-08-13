@@ -97,12 +97,6 @@ export default function WeeklyActionableDetail({ reportId, onBack, onEdit }: Pro
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Weekly Actionable</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-bold text-primary border-primary/40">
-                {data.reference_id}
-              </Badge>
-              State Office Coordination — Weekly Actionable Points
-            </p>
           </div>
         </div>
         {onEdit && data.status !== "approved" && (

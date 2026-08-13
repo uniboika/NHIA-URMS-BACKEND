@@ -220,10 +220,6 @@ export default function ServicomVisitForm({ visitId, onBack, defaultStateId, def
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Monitoring Visit</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-2">
-              {refId ? <Badge variant="outline" className="text-[10px]">{refId}</Badge> : <Badge variant="outline" className="text-[10px]">New</Badge>}
-              SERVICOM compliance assessment
-            </p>
           </div>
         </div>
         {live.percentage > 0 && (

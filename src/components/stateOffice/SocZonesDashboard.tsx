@@ -125,7 +125,6 @@ export default function SocZonesDashboard({ onBack, defaultStateId, defaultZoneI
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">SOC/Zones Unit Dashboard</h2>
-            <p className="text-xs text-muted-foreground">{unitScope.headline} — live data from SOC/Zones, Zonal & Finance reports</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">

@@ -882,10 +882,6 @@ export default function StateOfficeDashboard({
               </span>
             </div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight">State Office Performance</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {departments.length} departments · {totalStaff} staff
-              {stateOfficers > 0 && ` · ${stateOfficers} state officers`}
-            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             {onNewReport && (

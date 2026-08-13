@@ -27,7 +27,6 @@ export default function AdminSettingsPage() {
     <div className="relative z-10 p-6 max-w-7xl mx-auto space-y-5">
       <div>
         <h1 className="text-xl font-black text-slate-900 tracking-tight">Settings</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage users, roles, offices, departments and units.</p>
       </div>
 
       <div className="flex items-center gap-1 bg-white border border-[#d4e8dc] rounded-2xl p-1.5 w-fit flex-wrap">

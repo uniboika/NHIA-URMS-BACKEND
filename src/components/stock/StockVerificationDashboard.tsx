@@ -143,7 +143,6 @@ export default function StockVerificationDashboard({ onBack, defaultStateId, def
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Stock Verification Dashboard</h2>
-            <p className="text-xs text-muted-foreground">{unitScope.headline} — live Store Management counts</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">

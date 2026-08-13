@@ -159,9 +159,6 @@ export default function AnnualReportDetail({ referenceId, onBack }: AnnualReport
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight font-mono">{report.reference_id}</h2>
-            <p className="text-xs text-muted-foreground">
-              {report.state} &middot; {report.reporting_year} &middot; Submitted by {report.submitted_by || "—"}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">

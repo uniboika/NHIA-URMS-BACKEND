@@ -65,12 +65,6 @@ export default function ContractedServicesDetail({ reportId, onBack, onEdit }: P
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Contracted Services</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-bold text-primary border-primary/40">
-                {data.reference_id}
-              </Badge>
-              State Office Coordination — Monthly Contracted Services
-            </p>
           </div>
         </div>
         {onEdit && data.status !== "approved" && (

@@ -580,9 +580,6 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Facility Compliance Report</h2>
-              <p className="text-xs text-muted-foreground">
-                {v.reference_id ? v.reference_id : "Standards & Quality Assurance"}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -830,7 +827,6 @@ export default function ComplianceManagementPage({ onBack, defaultZoneId, defaul
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Facility Compliance Report</h2>
-            <p className="text-xs text-muted-foreground">SQA — Facility Compliance Reporting</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

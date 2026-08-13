@@ -772,9 +772,6 @@ export default function ZonalDirectorDashboard({
               <span className="text-xs font-bold text-[#25a872] uppercase tracking-wider">{zoneName} Zone</span>
             </div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight">Zonal Performance Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {states.length} states · {departments.length} departments
-            </p>
           </div>
           {onReviewReports && (
             <Button onClick={onReviewReports}

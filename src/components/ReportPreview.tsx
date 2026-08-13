@@ -56,7 +56,6 @@ export default function ReportPreview({ onBack, onEditSection, onSubmit }: Repor
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Report Preview & Submit</h2>
-            <p className="text-xs text-muted-foreground">Review your data before final submission to Zonal Office.</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

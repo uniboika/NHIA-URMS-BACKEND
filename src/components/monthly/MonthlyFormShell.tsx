@@ -82,13 +82,6 @@ export default function MonthlyFormShell({
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {refId
-                ? <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-bold text-primary border-primary/40">{refId}</Badge>
-                : <Badge variant="outline" className="text-[10px] h-4 px-1.5 uppercase font-bold">New</Badge>
-              }
-              {dept} — Monthly Report
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">

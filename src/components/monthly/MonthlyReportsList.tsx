@@ -105,7 +105,6 @@ export default function MonthlyReportsList({ onBack, onNew, defaultStateId, defa
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Monthly Reports</h2>
-            <p className="text-xs text-muted-foreground">All department monthly submissions</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

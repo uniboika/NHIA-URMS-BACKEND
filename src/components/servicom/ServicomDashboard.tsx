@@ -121,7 +121,6 @@ export default function ServicomDashboard({ onBack, defaultStateId, defaultZoneI
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">SERVICOM Unit Dashboard</h2>
-            <p className="text-xs text-muted-foreground">{unitScope.headline} — live data from SERVICOM records</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">

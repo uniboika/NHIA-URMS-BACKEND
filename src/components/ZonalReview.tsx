@@ -87,7 +87,6 @@ export default function ZonalReview({ onCompose }: ZonalReviewProps) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Zonal Tactical Review</h1>
-          <p className="text-muted-foreground">Review and validate state-level reports across your zone.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">

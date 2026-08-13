@@ -373,9 +373,6 @@ export default function StockAssetManager({ onBack }: Props) {
             <h2 className="text-xl font-bold tracking-tight">
               {showForm ? (editId ? "Edit Asset" : "New Asset") : "Asset Register"}
             </h2>
-            <p className="text-xs text-muted-foreground">
-              {showForm ? "Register an asset under zone → state → department → unit" : "Manage state stock assets"}
-            </p>
           </div>
         </div>
         {!showForm && (

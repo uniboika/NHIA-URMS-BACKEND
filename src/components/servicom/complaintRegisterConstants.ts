@@ -128,6 +128,48 @@ export function slaColorLabel(color?: ComplaintSlaColor | string) {
     default: return "White";
   }
 }
+
+export function slaColorDotClass(color?: ComplaintSlaColor | string) {
+  switch (color) {
+    case "yellow": return "bg-yellow-400";
+    case "amber": return "bg-amber-500";
+    case "red": return "bg-red-500";
+    default: return "bg-white border border-slate-300";
+  }
+}
+
+/** Working days past the current SLA breach threshold (0 if on track). */
+export function computeSlaOverdueDays(sla: {
+  working_days_elapsed?: number;
+  closed?: boolean;
+  escalated?: boolean;
+  acknowledged?: boolean;
+  investigation_commenced?: boolean;
+  rule?: {
+    acknowledge_days: number;
+    investigation_commence_days: number;
+    escalate_after_days: number;
+    target_resolution_days: number;
+  } | null;
+}) {
+  if (!sla?.rule || sla.closed) return 0;
+  const elapsed = sla.working_days_elapsed ?? 0;
+  const rule = sla.rule;
+
+  if (elapsed > rule.target_resolution_days) {
+    return elapsed - rule.target_resolution_days;
+  }
+  if (elapsed > rule.escalate_after_days && !sla.escalated) {
+    return elapsed - rule.escalate_after_days;
+  }
+  if (elapsed > rule.investigation_commence_days && !sla.investigation_commenced) {
+    return elapsed - rule.investigation_commence_days;
+  }
+  if (elapsed > rule.acknowledge_days && !sla.acknowledged) {
+    return elapsed - rule.acknowledge_days;
+  }
+  return 0;
+}
 export const SLA_SUMMARY = [
   { priority: "Top", acknowledge: "Within 1 working day", investigate: "Within 1 working day", escalate: "3 working days", resolve: "5 working days" },
   { priority: "High", acknowledge: "Within 1 working day", investigate: "Within 2 working days", escalate: "7 working days", resolve: "10 working days" },

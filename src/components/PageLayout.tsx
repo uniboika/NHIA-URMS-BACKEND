@@ -2,7 +2,6 @@ import React from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -64,13 +63,6 @@ export function PageLayout({
             <CardTitle className="text-xl font-bold tracking-tight md:text-2xl">
               {title}
             </CardTitle>
-          )
-        ) : null}
-        {description ? (
-          bare ? (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          ) : (
-            <CardDescription>{description}</CardDescription>
           )
         ) : null}
       </div>

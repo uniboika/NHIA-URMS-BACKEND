@@ -133,7 +133,6 @@ export default function StateOfficeComplianceVisitsPage({ onBack, defaultStateId
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">New Compliance Visit</h2>
-            <p className="text-xs text-muted-foreground">F.3 — Compliance monitoring / investigative visit</p>
           </div>
         </div>
         <ScrollArea className="flex-1">

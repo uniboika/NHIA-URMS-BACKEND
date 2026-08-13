@@ -75,7 +75,6 @@ export default function ServicomVisitsPage({ onBack, defaultStateId, defaultZone
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Monitoring Visits</h2>
-            <p className="text-xs text-muted-foreground">SERVICOM compliance assessments</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

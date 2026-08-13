@@ -102,7 +102,6 @@ export default function StockVerificationsList({ onBack }: Props) {
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Stock Verification</h2>
-            <p className="text-xs text-muted-foreground">Stocktaking exercises and asset counts</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

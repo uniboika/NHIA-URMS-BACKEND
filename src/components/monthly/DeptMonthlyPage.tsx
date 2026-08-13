@@ -131,7 +131,6 @@ export default function DeptMonthlyPage({ dept, title, section, onBack, defaultS
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-              <p className="text-xs text-muted-foreground">Monthly submissions</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

@@ -250,13 +250,6 @@ export default function AnnualReportForm({ onBack, onSubmit }: AnnualReportFormP
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Annual State Report</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {draftRefId
-                ? <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-bold text-primary border-primary/40">{draftRefId}</Badge>
-                : <Badge variant="outline" className="text-[10px] h-4 px-1.5 uppercase font-bold">Draft</Badge>
-              }
-              {general.state && general.year ? `${general.state} - ${general.year}` : "New Report"}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">

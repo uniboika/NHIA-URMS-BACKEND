@@ -135,7 +135,6 @@ export default function StateOfficeReconciliationPage({ onBack, defaultStateId, 
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Reconciliation Meeting</h2>
-            <p className="text-xs text-muted-foreground">HMO reconciliation records</p>
           </div>
         </div>
         <ScrollArea className="flex-1">

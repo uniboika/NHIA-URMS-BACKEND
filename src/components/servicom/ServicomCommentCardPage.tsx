@@ -176,6 +176,19 @@ export default function ServicomCommentCardPage({
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="space-y-1.5">
+            <Label className="text-xs text-slate-500">Date *</Label>
+            {readOnly ? (
+              <p className="text-sm font-medium text-slate-800">{row?.card_date}</p>
+            ) : (
+              <Input
+                type="date"
+                value={f.card_date}
+                onChange={(e) => setF((p) => ({ ...p, card_date: e.target.value }))}
+              />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Respondent Name</Label>
             {readOnly ? (
               <p className="text-sm font-medium text-slate-800">{row?.respondent_name || "—"}</p>
@@ -197,19 +210,6 @@ export default function ServicomCommentCardPage({
                 placeholder="Organisation name"
                 value={f.organisation}
                 onChange={(e) => setF((p) => ({ ...p, organisation: e.target.value }))}
-              />
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs text-slate-500">Date *</Label>
-            {readOnly ? (
-              <p className="text-sm font-medium text-slate-800">{row?.card_date}</p>
-            ) : (
-              <Input
-                type="date"
-                value={f.card_date}
-                onChange={(e) => setF((p) => ({ ...p, card_date: e.target.value }))}
               />
             )}
           </div>
@@ -319,7 +319,6 @@ export default function ServicomCommentCardPage({
             </Button>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Charter Performance</h2>
-              <p className="text-xs text-muted-foreground">Citizens&apos; Comment Card</p>
             </div>
           </div>
         </div>
@@ -358,7 +357,6 @@ export default function ServicomCommentCardPage({
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">Charter Performance</h2>
-            <p className="text-xs text-muted-foreground">Citizens&apos; Comment Card records</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -429,10 +427,10 @@ export default function ServicomCommentCardPage({
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-[#f0fdf7]">
+                        <TableHead className="text-xs font-bold">Date</TableHead>
                         <TableHead className="text-xs font-bold">Respondent</TableHead>
                         <TableHead className="text-xs font-bold">Organisation</TableHead>
                         <TableHead className="text-xs font-bold">State</TableHead>
-                        <TableHead className="text-xs font-bold">Date</TableHead>
                         <TableHead className="text-xs font-bold">Avg Score</TableHead>
                         <TableHead className="text-xs font-bold text-right w-24">Action</TableHead>
                       </TableRow>
@@ -441,10 +439,10 @@ export default function ServicomCommentCardPage({
                       {filteredCards.map((c, i) => (
                         <motion.tr key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
                           className="border-b border-slate-100">
+                          <TableCell className="text-xs text-slate-500">{c.card_date}</TableCell>
                           <TableCell className="text-sm">{c.respondent_name || "—"}</TableCell>
                           <TableCell className="text-sm">{c.organisation || "—"}</TableCell>
                           <TableCell className="text-xs">{c.state?.description ?? "—"}</TableCell>
-                          <TableCell className="text-xs text-slate-500">{c.card_date}</TableCell>
                           <TableCell className="text-sm font-semibold">{c.average_score ?? "—"}</TableCell>
                           <TableCell className="text-right">
                             <Button

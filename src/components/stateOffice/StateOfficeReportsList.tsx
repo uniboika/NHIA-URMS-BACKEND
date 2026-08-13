@@ -213,7 +213,6 @@ export default function StateOfficeReportsList({
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">{cfg.title}</h2>
-            <p className="text-xs text-muted-foreground">{cfg.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

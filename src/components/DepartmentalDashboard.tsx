@@ -707,10 +707,6 @@ export default function DepartmentalDashboard({ user }: Props) {
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-black text-slate-900 truncate">{dept.name}</h1>
-          <p className="text-xs text-slate-500 font-mono mt-0.5">{dept.department_code}</p>
-          {dept.description && (
-            <p className="text-xs text-slate-600 mt-1 line-clamp-1">{dept.description}</p>
-          )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <Badge

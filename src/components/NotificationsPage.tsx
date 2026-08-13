@@ -64,7 +64,6 @@ export default function NotificationsPage({ onBack }: Props) {
                 <Badge className="bg-rose-500 text-white text-[10px] px-1.5 py-0">{unread}</Badge>
               )}
             </h2>
-            <p className="text-xs text-muted-foreground">Updates on reports, approvals, and system alerts</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

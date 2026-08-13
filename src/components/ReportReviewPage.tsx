@@ -349,7 +349,6 @@ export default function ReportReviewPage({ role, onBack }: ReportReviewPageProps
           )}
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight">{roleConfig.title}</h1>
-            <p className="text-sm text-slate-500 mt-0.5">{roleConfig.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

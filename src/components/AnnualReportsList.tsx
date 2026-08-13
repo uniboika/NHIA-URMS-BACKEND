@@ -375,9 +375,6 @@ export default function AnnualReportsList({
           </Button>
           <div className="min-w-0">
             <h2 className="text-xl font-bold tracking-tight">Annual Report</h2>
-            <p className="text-xs text-muted-foreground truncate">
-              Computed from approved monthly departmental reports (Jan–Dec)
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

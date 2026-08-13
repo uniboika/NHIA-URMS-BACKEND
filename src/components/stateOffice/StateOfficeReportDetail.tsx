@@ -73,14 +73,6 @@ export default function StateOfficeReportDetail({ reportType, reportId, onBack, 
           </Button>
           <div>
             <h2 className="text-xl font-bold tracking-tight">{cfg.title} Report</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {report?.reference_id && (
-                <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-bold text-primary border-primary/40">
-                  {report.reference_id}
-                </Badge>
-              )}
-              {cfg.subtitle}
-            </p>
           </div>
         </div>
         {report?.status === "draft" && onEdit && (

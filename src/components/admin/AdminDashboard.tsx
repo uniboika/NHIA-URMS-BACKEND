@@ -2,7 +2,7 @@
 import {
   Users, MapPin, Building2, Layers, ShieldCheck, Activity,
   TrendingUp, TrendingDown, RefreshCw, Zap, Database,
-  Server, Wifi, CheckCircle2, AlertCircle, Clock,
+  Server, Wifi, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -113,10 +113,6 @@ export default function AdminDashboard({ onNavigate }: { onNavigate?: (tab: stri
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black text-slate-900 tracking-tight">Admin Overview</h1>
-          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-            <Clock className="w-3 h-3" />
-            Last refreshed: {lastRefresh.toLocaleTimeString()}
-          </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}
           className="border-[#d4e8dc] hover:bg-[#e8f5ee] gap-1.5 text-xs rounded-xl">
